@@ -49,6 +49,15 @@ function corrigirEspacamentoNome(nome) {
     return nome.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
+function getInitials(nome) {
+    if (!nome) return '?';
+    const parts = corrigirEspacamentoNome(nome).split(' ');
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+}
+
 // ==================== CARREGAR COMISSÕES ====================
 
 async function carregarComissoesPendentes() {
@@ -85,10 +94,32 @@ async function carregarComissoesPendentes() {
 
 function atualizarEstatisticas(comissoes) {
     const total = comissoes.length;
-    const valorTotal = comissoes.reduce((sum, c) => sum + parseFloat(c.commission_value || 0), 0);
+    const valorTotal = comissoes.reduce((sum, c) => sum + parseFloat(c.valor_comissao || c.commission_value || 0), 0);
     
-    document.getElementById('totalPendente').textContent = total;
+    // Animar contagem
+    animateValue('totalPendente', total);
     document.getElementById('valorTotal').textContent = formatCurrency(valorTotal);
+}
+
+function animateValue(elementId, endValue) {
+    const element = document.getElementById(elementId);
+    const duration = 500;
+    const startTime = performance.now();
+    const startValue = parseInt(element.textContent) || 0;
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.round(startValue + (endValue - startValue) * easeProgress);
+        element.textContent = currentValue;
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+    
+    requestAnimationFrame(update);
 }
 
 // ==================== RENDERIZAR TABELA ====================
@@ -96,44 +127,74 @@ function atualizarEstatisticas(comissoes) {
 function renderizarTabelaComissoesDirecao(comissoes) {
     const tbody = document.getElementById('corpoTabelaDirecao');
     
-    tbody.innerHTML = comissoes.map(comissao => {
+    tbody.innerHTML = comissoes.map((comissao, index) => {
         const atingiuGatilho = comissao.atingiu_gatilho;
-        const gatilhoClass = atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao';
+        const gatilhoClass = atingiuGatilho ? 'sim' : 'nao';
         const gatilhoText = atingiuGatilho ? 'SIM' : 'NÃO';
+        const nomeCorretor = corrigirEspacamentoNome(comissao.broker_nome);
+        const initials = getInitials(comissao.broker_nome);
         
         return `
-            <tr>
+            <tr style="animation: fadeInRow 0.3s ease ${index * 0.05}s both;">
                 <td>
                     <input type="checkbox" 
                            class="checkbox-direcao checkbox-comissao-direcao" 
                            data-id="${comissao.id}"
-                           data-valor="${comissao.commission_value || 0}"
+                           data-valor="${comissao.valor_comissao || comissao.commission_value || 0}"
                            onchange="toggleComissaoSelecionadaDirecao(this)">
                 </td>
-                <td>${corrigirEspacamentoNome(comissao.broker_nome)}</td>
+                <td>
+                    <div class="corretor-cell">
+                        <div class="corretor-avatar">${initials}</div>
+                        <div class="corretor-info">
+                            <span class="corretor-nome">${nomeCorretor}</span>
+                        </div>
+                    </div>
+                </td>
                 <td>${comissao.enterprise_name || '-'}</td>
                 <td>${comissao.unit_name || '-'}</td>
                 <td>${corrigirEspacamentoNome(comissao.customer_name)}</td>
-                <td>${formatCurrency(comissao.commission_value)}</td>
-                <td>${formatDate(comissao.commission_date)}</td>
-                <td class="${gatilhoClass}">${gatilhoText}</td>
+                <td class="valor-cell">${formatCurrency(comissao.valor_comissao || comissao.commission_value)}</td>
+                <td><span class="gatilho-badge ${gatilhoClass}">${gatilhoText}</span></td>
                 <td>${formatDate(comissao.data_envio_aprovacao)}</td>
             </tr>
         `;
     }).join('');
+    
+    // Adicionar estilo de animação
+    if (!document.getElementById('rowAnimation')) {
+        const style = document.createElement('style');
+        style.id = 'rowAnimation';
+        style.textContent = `
+            @keyframes fadeInRow {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 // ==================== SELEÇÃO DE COMISSÕES ====================
 
 function toggleComissaoSelecionadaDirecao(checkbox) {
     const id = parseInt(checkbox.dataset.id);
+    const row = checkbox.closest('tr');
     
     if (checkbox.checked) {
         if (!comissoesSelecionadasDirecao.includes(id)) {
             comissoesSelecionadasDirecao.push(id);
         }
+        row.classList.add('selected');
     } else {
         comissoesSelecionadasDirecao = comissoesSelecionadasDirecao.filter(cId => cId !== id);
+        row.classList.remove('selected');
     }
     
     atualizarAcoesLoteDirecao();
@@ -147,8 +208,13 @@ function toggleTodasDirecao() {
     
     checkboxes.forEach(cb => {
         cb.checked = checkboxPrincipal.checked;
+        const row = cb.closest('tr');
+        
         if (checkboxPrincipal.checked) {
             comissoesSelecionadasDirecao.push(parseInt(cb.dataset.id));
+            row.classList.add('selected');
+        } else {
+            row.classList.remove('selected');
         }
     });
     
@@ -175,9 +241,15 @@ async function aprovarComissoesSelecionadas() {
         return;
     }
     
-    if (!confirm(`Confirma a aprovação de ${comissoesSelecionadasDirecao.length} comissão(ões)?`)) {
+    if (!confirm(`Confirma a aprovação de ${comissoesSelecionadasDirecao.length} comissão(ões)?\n\nUm e-mail será enviado ao financeiro.`)) {
         return;
     }
+    
+    // Mostrar loading nos botões
+    const btnAprovar = document.querySelector('.btn-aprovar');
+    const originalText = btnAprovar.innerHTML;
+    btnAprovar.innerHTML = '<span class="loading-spinner" style="width:20px;height:20px;border-width:2px;margin:0;"></span> Aprovando...';
+    btnAprovar.disabled = true;
     
     try {
         const response = await fetch('/api/comissoes/aprovar', {
@@ -192,7 +264,11 @@ async function aprovarComissoesSelecionadas() {
         
         if (data.sucesso) {
             showAlert(data.mensagem || 'Comissões aprovadas com sucesso!', 'success');
+            if (data.email_enviado) {
+                showAlert('E-mail enviado ao financeiro!', 'info');
+            }
             comissoesSelecionadasDirecao = [];
+            document.getElementById('selecionarTodasDirecao').checked = false;
             carregarComissoesPendentes();
         } else {
             showAlert(data.erro || data.mensagem || 'Erro ao aprovar', 'error');
@@ -200,6 +276,9 @@ async function aprovarComissoesSelecionadas() {
     } catch (error) {
         console.error('Erro ao aprovar:', error);
         showAlert('Erro ao aprovar comissões', 'error');
+    } finally {
+        btnAprovar.innerHTML = originalText;
+        btnAprovar.disabled = false;
     }
 }
 
@@ -211,7 +290,9 @@ function abrirModalRejeitar() {
     
     document.getElementById('modalRejeitar').classList.add('active');
     document.getElementById('motivoRejeicao').value = '';
-    document.getElementById('motivoRejeicao').focus();
+    setTimeout(() => {
+        document.getElementById('motivoRejeicao').focus();
+    }, 100);
 }
 
 function fecharModalRejeitar() {
@@ -223,8 +304,15 @@ async function confirmarRejeicao() {
     
     if (!motivo) {
         showAlert('Informe o motivo da rejeição', 'error');
+        document.getElementById('motivoRejeicao').focus();
         return;
     }
+    
+    // Mostrar loading
+    const btnConfirmar = document.querySelector('.modal-buttons .btn-rejeitar');
+    const originalText = btnConfirmar.innerHTML;
+    btnConfirmar.innerHTML = '<span class="loading-spinner" style="width:20px;height:20px;border-width:2px;margin:0;"></span> Rejeitando...';
+    btnConfirmar.disabled = true;
     
     try {
         const response = await fetch('/api/comissoes/rejeitar', {
@@ -241,6 +329,7 @@ async function confirmarRejeicao() {
         if (data.sucesso) {
             showAlert(data.mensagem || 'Comissões rejeitadas', 'success');
             comissoesSelecionadasDirecao = [];
+            document.getElementById('selecionarTodasDirecao').checked = false;
             fecharModalRejeitar();
             carregarComissoesPendentes();
         } else {
@@ -249,6 +338,9 @@ async function confirmarRejeicao() {
     } catch (error) {
         console.error('Erro ao rejeitar:', error);
         showAlert('Erro ao rejeitar comissões', 'error');
+    } finally {
+        btnConfirmar.innerHTML = originalText;
+        btnConfirmar.disabled = false;
     }
 }
 
@@ -270,4 +362,11 @@ document.addEventListener('DOMContentLoaded', function() {
             fecharModalRejeitar();
         }
     });
+    
+    // Auto-refresh a cada 60 segundos
+    setInterval(() => {
+        if (!document.getElementById('modalRejeitar').classList.contains('active')) {
+            carregarComissoesPendentes();
+        }
+    }, 60000);
 });

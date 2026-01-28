@@ -425,11 +425,19 @@ def sincronizar():
         return jsonify({'erro': 'Apenas administradores podem sincronizar'}), 403
     
     try:
-        building_id = request.json.get('building_id') if request.is_json else None
+        building_id = None
+        if request.is_json and request.data:
+            data = request.get_json(silent=True)
+            if data:
+                building_id = data.get('building_id')
+        
         sync = SiengeSupabaseSync()
         resultado = sync.sync_all(building_id=building_id)
         return jsonify({'sucesso': True, 'resultado': resultado}), 200
     except Exception as e:
+        import traceback
+        print(f"[ERRO SINCRONIZAÇÃO] {str(e)}")
+        traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
 
 
@@ -442,6 +450,81 @@ def ultima_sincronizacao():
         return jsonify(ultima), 200
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
+
+
+@app.route('/api/limpar-cancelados', methods=['POST'])
+@login_required
+def limpar_cancelados():
+    """Remove comissões canceladas e duplicatas do banco de dados"""
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Apenas administradores podem executar esta ação'}), 403
+    
+    try:
+        sync = SiengeSupabaseSync()
+        resultado = {
+            'canceladas_antes': 0,
+            'canceladas_deletadas': 0,
+            'duplicatas_antes': 0,
+            'duplicatas_deletadas': 0
+        }
+        
+        # 1. Deletar comissões canceladas (pagas devem permanecer com status Aprovada)
+        result = sync.supabase.table('sienge_comissoes').select('id, installment_status').execute()
+        canceladas = [c for c in (result.data or []) if 'CANCEL' in (c.get('installment_status') or '').upper()]
+        
+        resultado['canceladas_antes'] = len(canceladas)
+        
+        for c in canceladas:
+            try:
+                sync.supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                resultado['canceladas_deletadas'] += 1
+            except:
+                pass
+        
+        # Atualizar comissões pagas para status Aprovada
+        pagas = [c for c in (result.data or []) 
+                 if 'PAID' in (c.get('installment_status') or '').upper() 
+                 or 'PAGO' in (c.get('installment_status') or '').upper()]
+        
+        resultado['pagas_atualizadas'] = 0
+        for c in pagas:
+            try:
+                sync.supabase.table('sienge_comissoes').update({'status_aprovacao': 'Aprovada'}).eq('id', c['id']).execute()
+                resultado['pagas_atualizadas'] += 1
+            except:
+                pass
+        
+        # 2. Remover duplicatas
+        result2 = sync.supabase.table('sienge_comissoes').select('*').execute()
+        grupos = {}
+        for c in (result2.data or []):
+            chave = f"{c.get('numero_contrato')}_{c.get('unit_name')}_{c.get('building_id')}"
+            if chave not in grupos:
+                grupos[chave] = []
+            grupos[chave].append(c)
+        
+        duplicatas = {k: v for k, v in grupos.items() if len(v) > 1}
+        resultado['duplicatas_antes'] = len(duplicatas)
+        
+        for chave, comissoes in duplicatas.items():
+            # Ordenar: não-canceladas primeiro, depois por ID
+            comissoes.sort(key=lambda x: ('CANCEL' in (x.get('installment_status') or '').upper(), x.get('id', 0)))
+            # Manter a primeira, deletar as outras
+            for c in comissoes[1:]:
+                try:
+                    sync.supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                    resultado['duplicatas_deletadas'] += 1
+                except:
+                    pass
+        
+        return jsonify({
+            'sucesso': True,
+            'mensagem': f"Limpeza concluída! Removidas {resultado['canceladas_deletadas']} canceladas e {resultado['duplicatas_deletadas']} duplicatas.",
+            'resultado': resultado
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 
 # ==================== API - USUÁRIOS ====================
@@ -531,8 +614,11 @@ def criar_regra_gatilho():
         nova_regra = {
             'nome': data.get('nome'),
             'descricao': data.get('descricao'),
+            'tipo_regra': data.get('tipo_regra', 'gatilho'),  # 'gatilho' ou 'faturamento'
             'percentual': data.get('percentual'),
             'inclui_itbi': data.get('inclui_itbi', False),
+            'faturamento_minimo': data.get('faturamento_minimo'),  # Valor mínimo para regra de faturamento
+            'percentual_auditoria': data.get('percentual_auditoria'),  # Percentual extra se passar na auditoria
             'ativo': True,
             'criado_em': datetime.now().isoformat()
         }
@@ -556,8 +642,11 @@ def atualizar_regra_gatilho(regra_id):
         atualizacao = {
             'nome': data.get('nome'),
             'descricao': data.get('descricao'),
+            'tipo_regra': data.get('tipo_regra', 'gatilho'),
             'percentual': data.get('percentual'),
             'inclui_itbi': data.get('inclui_itbi'),
+            'faturamento_minimo': data.get('faturamento_minimo'),
+            'percentual_auditoria': data.get('percentual_auditoria'),
             'atualizado_em': datetime.now().isoformat()
         }
         
@@ -585,6 +674,181 @@ def excluir_regra_gatilho(regra_id):
         return jsonify({'status': 'sucesso', 'mensagem': 'Regra excluída'}), 200
     except Exception as e:
         return jsonify({'status': 'erro', 'mensagem': str(e)}), 500
+
+
+# ==================== API - RELATÓRIO DE COMISSÕES ====================
+
+@app.route('/api/relatorio-comissoes', methods=['GET'])
+@login_required
+def relatorio_comissoes():
+    """Relatório completo de comissões com regras aplicadas - Para Gestor e Direção"""
+    # Verificar se o usuário tem perfil Gestor, Direção ou é admin
+    perfil = getattr(current_user, 'perfil', None)
+    is_gestor_ou_direcao = perfil in ['Gestor', 'Direção']
+    is_admin = hasattr(current_user, 'is_admin') and current_user.is_admin
+    
+    if not is_gestor_ou_direcao and not is_admin:
+        return jsonify({'erro': 'Apenas gestores e direção podem acessar o relatório'}), 403
+    
+    try:
+        sync = SiengeSupabaseSync()
+        
+        # Parâmetros de filtro
+        empreendimento_id = request.args.get('empreendimento_id')
+        corretor_id = request.args.get('corretor_id')
+        regra_id = request.args.get('regra_id')
+        auditoria = request.args.get('auditoria')
+        
+        # Buscar todas as comissões
+        query = sync.supabase.table('sienge_comissoes').select('*')
+        
+        # Filtrar apenas cancelados (pagas devem aparecer)
+        result = query.execute()
+        comissoes = [c for c in (result.data or []) 
+                     if 'cancel' not in (c.get('installment_status') or '').lower()]
+        
+        # Aplicar filtros
+        if empreendimento_id:
+            comissoes = [c for c in comissoes if str(c.get('building_id')) == str(empreendimento_id)]
+        
+        if corretor_id:
+            comissoes = [c for c in comissoes if str(c.get('broker_id')) == str(corretor_id)]
+        
+        if auditoria:
+            if auditoria == 'sim':
+                comissoes = [c for c in comissoes if c.get('auditoria_aprovada') == True]
+            elif auditoria == 'nao':
+                comissoes = [c for c in comissoes if c.get('auditoria_aprovada') == False]
+            elif auditoria == 'pendente':
+                comissoes = [c for c in comissoes if c.get('auditoria_aprovada') is None]
+        
+        # Buscar regras de gatilho para associar
+        regras_result = sync.supabase.table('regras_gatilho').select('*').execute()
+        regras_dict = {r['id']: r for r in (regras_result.data or [])}
+        
+        # Buscar contratos para pegar dados do cliente e lote
+        contratos_result = sync.supabase.table('sienge_contratos').select('*').execute()
+        contratos_dict = {c['numero_contrato']: c for c in (contratos_result.data or [])}
+        
+        # Buscar empreendimentos (usando o método do sync)
+        empreendimentos_lista = sync.get_empreendimentos()
+        empreendimentos_dict = {str(e['id']): e for e in empreendimentos_lista}
+        
+        # Montar relatório
+        relatorio = []
+        corretores_unicos = set()
+        total_comissoes = 0
+        auditorias_aprovadas = 0
+        
+        for comissao in comissoes:
+            numero_contrato = comissao.get('numero_contrato')
+            contrato = contratos_dict.get(numero_contrato, {})
+            
+            # Dados do empreendimento
+            building_id = comissao.get('building_id') or contrato.get('building_id')
+            empreendimento = empreendimentos_dict.get(building_id, {})
+            
+            # Regra aplicada
+            regra_id_aplicada = comissao.get('regra_gatilho_id')
+            regra = regras_dict.get(regra_id_aplicada, {})
+            
+            # Formatar regra para exibição
+            regra_nome = regra.get('nome', 'Não definida')
+            tipo_regra = regra.get('tipo_regra', 'gatilho')
+            
+            if tipo_regra == 'faturamento':
+                regra_descricao = f"Fat. Mín. R$ {regra.get('faturamento_minimo', 0):,.0f} → {regra.get('percentual', 0)}%"
+                if regra.get('percentual_auditoria'):
+                    regra_descricao += f" (+{regra.get('percentual_auditoria')}% auditoria)"
+            else:
+                regra_descricao = f"{regra.get('percentual', 0)}%"
+                if regra.get('inclui_itbi'):
+                    regra_descricao += " + ITBI"
+            
+            # Valor da comissão
+            valor_comissao = float(comissao.get('valor_comissao') or comissao.get('commission_value') or 0)
+            total_comissoes += valor_comissao
+            
+            # Auditoria
+            auditoria_status = comissao.get('auditoria_aprovada')
+            if auditoria_status == True:
+                auditorias_aprovadas += 1
+            
+            # Corretor
+            corretor_nome = comissao.get('broker_nome') or comissao.get('broker_name') or 'Não informado'
+            corretores_unicos.add(corretor_nome)
+            
+            # Filtrar por regra se especificado
+            if regra_id and str(regra_id_aplicada) != str(regra_id):
+                continue
+            
+            relatorio.append({
+                'numero_contrato': numero_contrato,
+                'lote': contrato.get('numero_lote') or comissao.get('unit_name') or f"Contrato {numero_contrato}",
+                'cliente': contrato.get('nome_cliente') or comissao.get('customer_name') or 'Não informado',
+                'empreendimento': empreendimento.get('nome') or comissao.get('building_name') or 'Não informado',
+                'empreendimento_id': building_id,
+                'corretor': corretor_nome,
+                'corretor_id': comissao.get('broker_id'),
+                'regra_id': regra_id_aplicada,
+                'regra_nome': regra_nome,
+                'regra_descricao': regra_descricao,
+                'tipo_regra': tipo_regra,
+                'auditoria_aprovada': auditoria_status,
+                'valor_comissao': valor_comissao,
+                'status_aprovacao': comissao.get('status_aprovacao', 'Pendente')
+            })
+        
+        # Ordenar por empreendimento e lote
+        relatorio.sort(key=lambda x: (x.get('empreendimento', ''), x.get('lote', '')))
+        
+        return jsonify({
+            'sucesso': True,
+            'dados': relatorio,
+            'resumo': {
+                'total_vendas': len(relatorio),
+                'total_comissoes': total_comissoes,
+                'total_corretores': len(corretores_unicos),
+                'auditorias_aprovadas': auditorias_aprovadas
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        print(f"[ERRO RELATÓRIO] {str(e)}")
+        traceback.print_exc()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
+@app.route('/api/relatorio-comissoes/corretores', methods=['GET'])
+@login_required
+def listar_corretores_relatorio():
+    """Lista corretores únicos para o filtro do relatório - Para Gestor e Direção"""
+    # Verificar se o usuário tem perfil Gestor, Direção ou é admin
+    perfil = getattr(current_user, 'perfil', None)
+    is_gestor_ou_direcao = perfil in ['Gestor', 'Direção']
+    is_admin = hasattr(current_user, 'is_admin') and current_user.is_admin
+    
+    if not is_gestor_ou_direcao and not is_admin:
+        return jsonify({'erro': 'Acesso negado'}), 403
+    
+    try:
+        sync = SiengeSupabaseSync()
+        result = sync.supabase.table('sienge_comissoes').select('broker_id, broker_nome').execute()
+        
+        corretores = {}
+        for c in (result.data or []):
+            broker_id = c.get('broker_id')
+            broker_nome = c.get('broker_nome')
+            if broker_id and broker_nome and broker_id not in corretores:
+                corretores[broker_id] = broker_nome
+        
+        lista = [{'id': k, 'nome': v} for k, v in corretores.items()]
+        lista.sort(key=lambda x: x['nome'])
+        
+        return jsonify(lista), 200
+    except Exception as e:
+        return jsonify([]), 200
 
 
 # ==================== API - COMISSÕES E APROVAÇÃO ====================
@@ -631,6 +895,10 @@ def listar_todas_comissoes():
         result = query.execute()
         comissoes = result.data if result.data else []
         
+        # FILTRAR CANCELADOS - Remover comissões com installment_status CANCELLED (pagas devem aparecer)
+        comissoes = [c for c in comissoes 
+                     if 'CANCEL' not in (c.get('installment_status') or '').upper()]
+        
         # Log dos status unicos para debug
         status_unicos = set()
         for c in comissoes:
@@ -638,6 +906,12 @@ def listar_todas_comissoes():
             if st:
                 status_unicos.add(st)
         print(f"[API] Status de parcela encontrados: {sorted(status_unicos)}")
+        
+        # DEBUG: Verificar valores de comissão e todos os campos disponíveis
+        if comissoes:
+            exemplo = comissoes[0]
+            print(f"[DEBUG] Exemplo comissão - valor_comissao: {exemplo.get('valor_comissao')}, commission_value: {exemplo.get('commission_value')}")
+            print(f"[DEBUG] Campos com valor: installment_percentage={exemplo.get('installment_percentage')}, contract_percentage_paid={exemplo.get('contract_percentage_paid')}")
         
         # Aplicar filtros em Python (mais flexível)
         # Mapeamento de status PT-BR para valores em inglês
@@ -774,6 +1048,60 @@ def listar_comissoes_pendentes_aprovacao():
         }), 200
         
     except Exception as e:
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
+# ==================== API - REVERTER COMISSÕES ====================
+
+@app.route('/api/comissoes/reverter-status', methods=['GET', 'POST'])
+@login_required
+def reverter_status_comissoes():
+    """Reverte todas as comissões com status diferente de 'Pendente' para 'Pendente'"""
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Apenas administradores podem executar esta ação'}), 403
+    
+    try:
+        sync = SiengeSupabaseSync()
+        
+        # Buscar comissões que não estão pendentes
+        result = sync.supabase.table('sienge_comissoes')\
+            .select('id, status_aprovacao, broker_nome')\
+            .neq('status_aprovacao', 'Pendente')\
+            .execute()
+        
+        comissoes_para_reverter = result.data if result.data else []
+        total = len(comissoes_para_reverter)
+        revertidas = 0
+        
+        print(f"[REVERTER] Encontradas {total} comissões para reverter")
+        
+        for c in comissoes_para_reverter:
+            try:
+                sync.supabase.table('sienge_comissoes')\
+                    .update({
+                        'status_aprovacao': 'Pendente',
+                        'data_envio_aprovacao': None,
+                        'enviado_por': None,
+                        'data_aprovacao': None,
+                        'aprovado_por': None,
+                        'observacoes': None
+                    })\
+                    .eq('id', c['id'])\
+                    .execute()
+                revertidas += 1
+                print(f"[REVERTER] Comissão {c['id']} ({c.get('broker_nome', 'N/A')}) revertida de '{c.get('status_aprovacao')}' para 'Pendente'")
+            except Exception as e:
+                print(f"[REVERTER] Erro ao reverter comissão {c['id']}: {str(e)}")
+        
+        return jsonify({
+            'sucesso': True,
+            'mensagem': f'{revertidas} comissões revertidas para status Pendente',
+            'total_encontradas': total,
+            'revertidas': revertidas
+        }), 200
+        
+    except Exception as e:
+        print(f"[REVERTER] Erro: {str(e)}")
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 

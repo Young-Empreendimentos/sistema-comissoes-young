@@ -49,27 +49,36 @@ async function fetchComRetry(url, options = {}, retries = 3) {
 /**
  * Extrai o numero do lote/unidade de diferentes formatos de dados
  * @param {any} unidadeData - Pode ser array de objetos, JSON string ou string simples
- * @returns {string} - Numero do lote formatado
+ * @returns {string} - Numero do lote formatado (apenas o número, sem "Lote")
  */
 function extrairNumeroLote(unidadeData) {
     if (!unidadeData) return '';
     
+    let resultado = '';
+    
     if (Array.isArray(unidadeData)) {
         // Array de objetos: extrair campo 'name'
-        return unidadeData.map(u => u.name || u).join(', ');
+        resultado = unidadeData.map(u => u.name || u).join(', ');
     } else if (typeof unidadeData === 'string') {
         // Tentar parse se for JSON string
         try {
             const parsed = JSON.parse(unidadeData);
             if (Array.isArray(parsed)) {
-                return parsed.map(u => u.name || u).join(', ');
+                resultado = parsed.map(u => u.name || u).join(', ');
+            } else {
+                resultado = unidadeData;
             }
-            return unidadeData;
         } catch {
-            return unidadeData;
+            resultado = unidadeData;
         }
+    } else {
+        resultado = String(unidadeData);
     }
-    return String(unidadeData);
+    
+    // Remover prefixo "Lote" se existir (para evitar "Lote Lote")
+    resultado = resultado.replace(/^Lote\s*/i, '').trim();
+    
+    return resultado;
 }
 
 function formatCurrency(value) {
@@ -247,6 +256,8 @@ function setupNavigation() {
                 buscarComissoes();
             } else if (pageId === 'configuracoes') {
                 initConfiguracoes();
+            } else if (pageId === 'relatorio-comissoes') {
+                carregarFiltrosRelatorio();
             }
         });
     });
@@ -330,7 +341,9 @@ async function setupEmpreendimentoPage() {
                 option.value = contrato.numero_contrato;
                 option.dataset.buildingId = buildingId;
                 const unidadeDisplay = extrairNumeroLote(contrato.unidade || contrato.unidades);
-                option.textContent = `Lote ${unidadeDisplay || contrato.numero_contrato} - ${corrigirEspacamentoNome(contrato.nome_cliente)}`;
+                // Formato padrão: "Lote [Numero] - [Nome Cliente]"
+                const loteNumero = unidadeDisplay || contrato.numero_contrato;
+                option.textContent = `Lote ${loteNumero} - ${corrigirEspacamentoNome(contrato.nome_cliente)}`;
                 contractSelect.appendChild(option);
             });
             
@@ -431,9 +444,10 @@ async function setupContratoPage() {
                 if (contratos && contratos.length > 0) {
                     autocompleteResults.innerHTML = contratos.map(c => {
                         const unidadeDisplay = extrairNumeroLote(c.unidade || c.unidades);
+                        const loteNumero = unidadeDisplay || c.numero_contrato;
                         return `
                         <div class="autocomplete-item" data-numero="${c.numero_contrato}" data-building="${c.building_id}">
-                            <strong>Lote ${unidadeDisplay || c.numero_contrato}</strong> - ${corrigirEspacamentoNome(c.nome_cliente)}<br>
+                            <strong>Lote ${loteNumero}</strong> - ${corrigirEspacamentoNome(c.nome_cliente)}<br>
                             <small>${c.sienge_empreendimentos?.nome || ''} - Contrato: ${c.numero_contrato}</small>
                         </div>
                     `}).join('');
@@ -712,7 +726,7 @@ function renderizarTabelaComissoes(comissoes) {
                 <td>${c.enterprise_name || '-'}</td>
                 <td>${c.unit_name || '-'}</td>
                 <td>${corrigirEspacamentoNome(c.customer_name)}</td>
-                <td>${formatCurrency(c.commission_value)}</td>
+                <td>${formatCurrency(c.valor_comissao || c.commission_value)}</td>
                 <td>${formatCurrency(c.valor_gatilho)}</td>
                 <td class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
                 <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacao}</span></td>
@@ -1136,7 +1150,330 @@ document.addEventListener('click', (e) => {
     if (e.target === modal) {
         fecharModalNovoUsuario();
     }
+    
+    const modalRegra = document.getElementById('modalRegra');
+    if (e.target === modalRegra) {
+        fecharModalRegra();
+    }
+    
+    const modalConfirmacao = document.getElementById('modalConfirmacaoExclusao');
+    if (e.target === modalConfirmacao) {
+        fecharModalConfirmacao();
+    }
 });
+
+// ================================
+// REGRAS DE COMISSÃO (GATILHO E FATURAMENTO)
+// ================================
+
+let regrasGatilho = [];
+let regraParaExcluir = null;
+
+// Função para mostrar aba de configuração
+window.mostrarConfigTab = function(tabId) {
+    // Esconder todas as abas
+    const tabs = ['configUsuarios', 'configCorretores', 'configEmails', 'configRegras'];
+    tabs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    
+    // Mostrar a aba selecionada
+    const selectedTab = document.getElementById(tabId);
+    if (selectedTab) {
+        selectedTab.style.display = 'block';
+    }
+    
+    // Atualizar botões ativos
+    document.querySelectorAll('.config-tab').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.config === tabId) {
+            btn.classList.add('active');
+        }
+    });
+};
+
+// Toggle entre tipo de regra (gatilho vs faturamento)
+window.toggleTipoRegra = function() {
+    const tipoSelecionado = document.querySelector('input[name="tipoRegra"]:checked')?.value || 'gatilho';
+    const camposGatilho = document.getElementById('camposGatilho');
+    const camposFaturamento = document.getElementById('camposFaturamento');
+    
+    if (tipoSelecionado === 'gatilho') {
+        camposGatilho.style.display = 'block';
+        camposFaturamento.style.display = 'none';
+    } else {
+        camposGatilho.style.display = 'none';
+        camposFaturamento.style.display = 'block';
+    }
+};
+
+// Carregar regras de gatilho (usando tabela existente regras_gatilho)
+window.carregarRegrasComissao = async function() {
+    const tbody = document.getElementById('corpoTabelaRegras');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #999;"><div class="spinner" style="margin: 0 auto;"></div><p>Carregando regras...</p></td></tr>';
+    
+    try {
+        const response = await fetch('/api/regras-gatilho');
+        const data = await response.json();
+        
+        if (Array.isArray(data)) {
+            regrasGatilho = data;
+            renderizarTabelaRegras();
+        } else if (data.status === 'erro') {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #f87171;">Erro ao carregar regras: ' + (data.mensagem || 'Erro desconhecido') + '</td></tr>';
+        } else {
+            regrasGatilho = [];
+            renderizarTabelaRegras();
+        }
+    } catch (error) {
+        console.error('Erro ao carregar regras:', error);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #f87171;">Erro ao carregar regras de comissão</td></tr>';
+    }
+};
+
+// Formatar valor em moeda
+function formatarMoeda(valor) {
+    if (!valor && valor !== 0) return '-';
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+}
+
+// Renderizar tabela de regras
+function renderizarTabelaRegras() {
+    const tbody = document.getElementById('corpoTabelaRegras');
+    if (!tbody) return;
+    
+    if (regrasGatilho.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 3rem; color: #666;">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="margin-bottom: 1rem;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <p style="margin-bottom: 0.5rem;">Nenhuma regra de comissão cadastrada</p>
+                    <p style="font-size: 0.85rem; color: #555;">Clique em "Nova Regra" para adicionar</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = regrasGatilho.map(regra => {
+        const tipoRegra = regra.tipo_regra || 'gatilho';
+        let regraFormatada = '';
+        let tipoBadge = '';
+        
+        if (tipoRegra === 'faturamento') {
+            // Regra de faturamento
+            tipoBadge = '<span style="background: rgba(96, 165, 250, 0.15); color: #60a5fa; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">Faturamento</span>';
+            regraFormatada = `
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <code style="background: #2a2a2a; padding: 0.25rem 0.5rem; border-radius: 4px; color: #60a5fa; font-size: 0.85rem;">Mín. ${formatarMoeda(regra.faturamento_minimo)} → ${regra.percentual}%</code>
+                    ${regra.percentual_auditoria ? `<code style="background: #2a2a2a; padding: 0.25rem 0.5rem; border-radius: 4px; color: #fbbf24; font-size: 0.8rem;">+ ${regra.percentual_auditoria}% auditoria</code>` : ''}
+                </div>
+            `;
+        } else {
+            // Regra de gatilho (padrão)
+            tipoBadge = '<span style="background: rgba(74, 222, 128, 0.15); color: #4ade80; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">Gatilho</span>';
+            const regraTexto = regra.inclui_itbi ? `${regra.percentual}% + ITBI` : `${regra.percentual}%`;
+            regraFormatada = `<code style="background: #2a2a2a; padding: 0.25rem 0.5rem; border-radius: 4px; color: #4ade80; font-size: 0.85rem;">${regraTexto}</code>`;
+        }
+        
+        return `
+        <tr style="border-bottom: 1px solid #333; transition: background 0.2s;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 1rem; font-weight: 500;">${regra.nome || '-'}</td>
+            <td style="padding: 1rem;">${tipoBadge}</td>
+            <td style="padding: 1rem;">${regraFormatada}</td>
+            <td style="padding: 1rem; color: #999; font-size: 0.9rem;">${regra.descricao || '-'}</td>
+            <td style="padding: 1rem; text-align: center;">
+                <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; ${regra.ativo !== false ? 'background: rgba(74, 222, 128, 0.2); color: #4ade80;' : 'background: rgba(248, 113, 113, 0.2); color: #f87171;'}">
+                    ${regra.ativo !== false ? 'Ativa' : 'Inativa'}
+                </span>
+            </td>
+            <td style="padding: 1rem; text-align: center;">
+                <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                    <button onclick="editarRegra(${regra.id})" class="btn-icon" style="background: #2a2a2a; border: 1px solid #444; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; color: #fff; font-size: 0.8rem; transition: all 0.2s;" title="Editar" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#2a2a2a'">
+                        Editar
+                    </button>
+                    <button onclick="excluirRegra(${regra.id})" class="btn-icon" style="background: transparent; border: 1px solid #444; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; color: #888; font-size: 0.8rem; transition: all 0.2s;" title="Excluir" onmouseover="this.style.color='#f87171';this.style.borderColor='#f87171'" onmouseout="this.style.color='#888';this.style.borderColor='#444'">
+                        Excluir
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `}).join('');
+}
+
+// Abrir modal para nova regra
+window.abrirModalNovaRegra = function() {
+    document.getElementById('tituloModalRegra').textContent = 'Nova Regra de Comissão';
+    document.getElementById('regraId').value = '';
+    document.getElementById('regraNome').value = '';
+    
+    // Reset tipo de regra para gatilho
+    document.querySelector('input[name="tipoRegra"][value="gatilho"]').checked = true;
+    toggleTipoRegra();
+    
+    // Campos de gatilho
+    document.getElementById('regraPercentual').value = '10';
+    document.getElementById('regraIncluiItbi').checked = true;
+    
+    // Campos de faturamento
+    document.getElementById('regraFaturamentoMinimo').value = '120000';
+    document.getElementById('regraPercentualFaturamento').value = '5';
+    document.getElementById('regraPercentualAuditoria').value = '1';
+    
+    document.getElementById('regraDescricao').value = '';
+    
+    document.getElementById('modalRegra').style.display = 'flex';
+};
+
+// Editar regra existente
+window.editarRegra = function(id) {
+    const regra = regrasGatilho.find(r => r.id === id);
+    if (!regra) return;
+    
+    document.getElementById('tituloModalRegra').textContent = 'Editar Regra de Comissão';
+    document.getElementById('regraId').value = regra.id;
+    document.getElementById('regraNome').value = regra.nome || '';
+    document.getElementById('regraDescricao').value = regra.descricao || '';
+    
+    // Definir tipo de regra
+    const tipoRegra = regra.tipo_regra || 'gatilho';
+    document.querySelector(`input[name="tipoRegra"][value="${tipoRegra}"]`).checked = true;
+    toggleTipoRegra();
+    
+    if (tipoRegra === 'faturamento') {
+        document.getElementById('regraFaturamentoMinimo').value = regra.faturamento_minimo || 120000;
+        document.getElementById('regraPercentualFaturamento').value = regra.percentual || 5;
+        document.getElementById('regraPercentualAuditoria').value = regra.percentual_auditoria || 0;
+    } else {
+        document.getElementById('regraPercentual').value = regra.percentual || 10;
+        document.getElementById('regraIncluiItbi').checked = regra.inclui_itbi !== false;
+    }
+    
+    document.getElementById('modalRegra').style.display = 'flex';
+};
+
+// Fechar modal de regra
+window.fecharModalRegra = function() {
+    document.getElementById('modalRegra').style.display = 'none';
+};
+
+// Salvar regra
+window.salvarRegra = async function(event) {
+    event.preventDefault();
+    
+    const id = document.getElementById('regraId').value;
+    const nome = document.getElementById('regraNome').value.trim();
+    const descricao = document.getElementById('regraDescricao').value.trim();
+    const tipoRegra = document.querySelector('input[name="tipoRegra"]:checked')?.value || 'gatilho';
+    
+    if (!nome) {
+        showAlert('Nome da regra é obrigatório', 'error');
+        return;
+    }
+    
+    let dados = {
+        nome,
+        descricao,
+        tipo_regra: tipoRegra
+    };
+    
+    if (tipoRegra === 'faturamento') {
+        const faturamentoMinimo = parseFloat(document.getElementById('regraFaturamentoMinimo').value);
+        const percentual = parseFloat(document.getElementById('regraPercentualFaturamento').value);
+        const percentualAuditoria = parseFloat(document.getElementById('regraPercentualAuditoria').value) || 0;
+        
+        if (isNaN(faturamentoMinimo) || faturamentoMinimo <= 0) {
+            showAlert('Faturamento mínimo deve ser maior que zero', 'error');
+            return;
+        }
+        
+        if (isNaN(percentual) || percentual <= 0 || percentual > 100) {
+            showAlert('Percentual deve ser um valor entre 0 e 100', 'error');
+            return;
+        }
+        
+        dados.faturamento_minimo = faturamentoMinimo;
+        dados.percentual = percentual;
+        dados.percentual_auditoria = percentualAuditoria;
+        dados.inclui_itbi = false;
+    } else {
+        const percentual = parseFloat(document.getElementById('regraPercentual').value);
+        const inclui_itbi = document.getElementById('regraIncluiItbi').checked;
+        
+        if (isNaN(percentual) || percentual <= 0 || percentual > 100) {
+            showAlert('Percentual deve ser um valor entre 0 e 100', 'error');
+            return;
+        }
+        
+        dados.percentual = percentual;
+        dados.inclui_itbi = inclui_itbi;
+        dados.faturamento_minimo = null;
+        dados.percentual_auditoria = null;
+    }
+    
+    try {
+        const url = id ? `/api/regras-gatilho/${id}` : '/api/regras-gatilho';
+        const method = id ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.status === 'sucesso') {
+            showAlert(id ? 'Regra atualizada com sucesso!' : 'Regra criada com sucesso!', 'success');
+            fecharModalRegra();
+            carregarRegrasComissao();
+        } else {
+            showAlert(result.mensagem || 'Erro ao salvar regra', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar regra:', error);
+        showAlert('Erro ao salvar regra', 'error');
+    }
+};
+
+// Excluir regra
+window.excluirRegra = function(id) {
+    regraParaExcluir = id;
+    document.getElementById('modalConfirmacaoExclusao').style.display = 'flex';
+};
+
+// Fechar modal de confirmação
+window.fecharModalConfirmacao = function() {
+    document.getElementById('modalConfirmacaoExclusao').style.display = 'none';
+    regraParaExcluir = null;
+};
+
+// Confirmar exclusão
+window.confirmarExclusaoRegra = async function() {
+    if (!regraParaExcluir) return;
+    
+    try {
+        const response = await fetch(`/api/regras-gatilho/${regraParaExcluir}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.status === 'sucesso') {
+            showAlert('Regra excluída com sucesso!', 'success');
+            fecharModalConfirmacao();
+            carregarRegrasComissao();
+        } else {
+            showAlert(result.mensagem || 'Erro ao excluir regra', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao excluir regra:', error);
+        showAlert('Erro ao excluir regra', 'error');
+    }
+};
 
 // ================================
 // INICIALIZAÇÃO
@@ -1166,6 +1503,283 @@ async function inicializarSistema() {
         console.error('Erro na inicializacao:', error);
     }
 }
+
+// ================================
+// RELATÓRIO DE COMISSÕES
+// ================================
+
+let dadosRelatorio = [];
+
+// Carregar filtros do relatório
+window.carregarFiltrosRelatorio = async function() {
+    try {
+        // Carregar empreendimentos
+        const empreendimentosResponse = await fetch('/api/empreendimentos');
+        const empreendimentos = await empreendimentosResponse.json();
+        
+        const selectEmpreendimento = document.getElementById('filtroRelatorioEmpreendimento');
+        if (selectEmpreendimento && Array.isArray(empreendimentos)) {
+            selectEmpreendimento.innerHTML = '<option value="">Todos</option>';
+            empreendimentos.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.id;
+                option.textContent = emp.nome;
+                selectEmpreendimento.appendChild(option);
+            });
+        }
+        
+        // Carregar corretores
+        const corretoresResponse = await fetch('/api/relatorio-comissoes/corretores');
+        const corretores = await corretoresResponse.json();
+        
+        const selectCorretor = document.getElementById('filtroRelatorioCorretor');
+        if (selectCorretor && Array.isArray(corretores)) {
+            selectCorretor.innerHTML = '<option value="">Todos</option>';
+            corretores.forEach(cor => {
+                const option = document.createElement('option');
+                option.value = cor.id;
+                option.textContent = cor.nome;
+                selectCorretor.appendChild(option);
+            });
+        }
+        
+        // Carregar regras
+        const regrasResponse = await fetch('/api/regras-gatilho');
+        const regras = await regrasResponse.json();
+        
+        const selectRegra = document.getElementById('filtroRelatorioRegra');
+        if (selectRegra && Array.isArray(regras)) {
+            selectRegra.innerHTML = '<option value="">Todas</option>';
+            regras.forEach(regra => {
+                const option = document.createElement('option');
+                option.value = regra.id;
+                option.textContent = regra.nome;
+                selectRegra.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar filtros do relatório:', error);
+    }
+};
+
+// Carregar relatório de comissões
+window.carregarRelatorioComissoes = async function() {
+    console.log('[RELATÓRIO] Iniciando carregamento...');
+    const tbody = document.getElementById('corpoTabelaRelatorio');
+    const loading = document.getElementById('loadingRelatorio');
+    const resumo = document.getElementById('resumoRelatorio');
+    
+    console.log('[RELATÓRIO] Elementos encontrados:', { tbody: !!tbody, loading: !!loading, resumo: !!resumo });
+    
+    if (!tbody) {
+        console.error('[RELATÓRIO] Elemento corpoTabelaRelatorio não encontrado!');
+        return;
+    }
+    
+    // Mostrar loading
+    if (loading) loading.style.display = 'flex';
+    tbody.innerHTML = '';
+    
+    try {
+        // Coletar filtros
+        const params = new URLSearchParams();
+        
+        const empreendimento = document.getElementById('filtroRelatorioEmpreendimento')?.value;
+        const corretor = document.getElementById('filtroRelatorioCorretor')?.value;
+        const regra = document.getElementById('filtroRelatorioRegra')?.value;
+        const auditoria = document.getElementById('filtroRelatorioAuditoria')?.value;
+        
+        if (empreendimento) params.append('empreendimento_id', empreendimento);
+        if (corretor) params.append('corretor_id', corretor);
+        if (regra) params.append('regra_id', regra);
+        if (auditoria) params.append('auditoria', auditoria);
+        
+        const response = await fetch(`/api/relatorio-comissoes?${params.toString()}`);
+        const result = await response.json();
+        
+        if (loading) loading.style.display = 'none';
+        
+        console.log('[RELATÓRIO] Resposta da API:', result);
+        
+        if (result.sucesso && result.dados) {
+            dadosRelatorio = result.dados;
+            console.log('[RELATÓRIO] Dados carregados:', dadosRelatorio.length, 'registros');
+            
+            // Atualizar resumo
+            if (resumo) {
+                resumo.style.display = 'block';
+                document.getElementById('totalVendasRelatorio').textContent = result.resumo.total_vendas;
+                document.getElementById('totalComissoesRelatorio').textContent = formatCurrency(result.resumo.total_comissoes);
+                document.getElementById('totalCorretoresRelatorio').textContent = result.resumo.total_corretores;
+                document.getElementById('totalAuditoriasRelatorio').textContent = result.resumo.auditorias_aprovadas;
+                console.log('[RELATÓRIO] Resumo atualizado');
+            }
+            
+            // Renderizar tabela
+            console.log('[RELATÓRIO] Renderizando tabela...');
+            renderizarTabelaRelatorio(dadosRelatorio);
+            console.log('[RELATÓRIO] Tabela renderizada');
+        } else {
+            console.error('[RELATÓRIO] Erro na resposta:', result.erro);
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #f87171;">Erro ao carregar relatório: ${result.erro || 'Erro desconhecido'}</td></tr>`;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar relatório:', error);
+        if (loading) loading.style.display = 'none';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #f87171;">Erro ao carregar relatório de comissões</td></tr>';
+    }
+};
+
+// Renderizar tabela do relatório
+function renderizarTabelaRelatorio(dados) {
+    const tbody = document.getElementById('corpoTabelaRelatorio');
+    if (!tbody) return;
+    
+    if (dados.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 4rem 2rem; color: #666;">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="margin-bottom: 1rem;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <p style="font-size: 0.95rem;">Nenhum registro encontrado com os filtros selecionados</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = dados.map(item => {
+        // Badge de tipo de regra
+        let regraBadge = '';
+        if (item.tipo_regra === 'faturamento') {
+            regraBadge = `<span style="display: inline-block; background: rgba(96, 165, 250, 0.15); color: #60a5fa; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; margin-bottom: 0.25rem; font-weight: 500;">Faturamento</span>`;
+        } else {
+            regraBadge = `<span style="display: inline-block; background: rgba(74, 222, 128, 0.15); color: #4ade80; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; margin-bottom: 0.25rem; font-weight: 500;">Gatilho</span>`;
+        }
+        
+        // Badge de auditoria
+        let auditoriaBadge = '';
+        if (item.auditoria_aprovada === true) {
+            auditoriaBadge = '<span style="background: rgba(74, 222, 128, 0.15); color: #4ade80; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500;">Aprovada</span>';
+        } else if (item.auditoria_aprovada === false) {
+            auditoriaBadge = '<span style="background: rgba(248, 113, 113, 0.15); color: #f87171; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500;">Reprovada</span>';
+        } else {
+            auditoriaBadge = '<span style="background: rgba(156, 163, 175, 0.15); color: #9ca3af; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem;">Pendente</span>';
+        }
+        
+        return `
+        <tr style="border-bottom: 1px solid #333; transition: background 0.2s;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 1rem; font-weight: 500; color: #FE5009;">${item.lote || '-'}</td>
+            <td style="padding: 1rem;">${item.cliente || '-'}</td>
+            <td style="padding: 1rem; color: #999;">${item.empreendimento || '-'}</td>
+            <td style="padding: 1rem;">${item.corretor || '-'}</td>
+            <td style="padding: 1rem;">
+                <div style="display: flex; flex-direction: column;">
+                    ${regraBadge}
+                    <span style="font-weight: 500;">${item.regra_nome || 'Não definida'}</span>
+                    <span style="font-size: 0.8rem; color: #999;">${item.regra_descricao || ''}</span>
+                </div>
+            </td>
+            <td style="padding: 1rem; text-align: center;">${auditoriaBadge}</td>
+            <td style="padding: 1rem; text-align: right; font-weight: 600; color: #4ade80;">${formatCurrency(item.valor_comissao)}</td>
+        </tr>
+    `}).join('');
+}
+
+// Limpar filtros do relatório
+window.limparFiltrosRelatorio = function() {
+    document.getElementById('filtroRelatorioEmpreendimento').value = '';
+    document.getElementById('filtroRelatorioCorretor').value = '';
+    document.getElementById('filtroRelatorioRegra').value = '';
+    document.getElementById('filtroRelatorioAuditoria').value = '';
+    
+    // Limpar tabela
+    const tbody = document.getElementById('corpoTabelaRelatorio');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr><td colspan="7" style="text-align: center; padding: 4rem 2rem; color: #666;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="margin-bottom: 1rem;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <p style="font-size: 0.95rem;">Clique em "Buscar" para carregar o relatório</p>
+            </td></tr>
+        `;
+    }
+    
+    // Esconder resumo
+    const resumo = document.getElementById('resumoRelatorio');
+    if (resumo) resumo.style.display = 'none';
+    
+    dadosRelatorio = [];
+};
+
+// Exportar relatório para Excel
+window.exportarRelatorioComissoes = async function(formato) {
+    if (dadosRelatorio.length === 0) {
+        showAlert('Carregue o relatório antes de exportar', 'warning');
+        return;
+    }
+    
+    try {
+        // Criar dados para CSV/Excel
+        const headers = ['Lote', 'Cliente', 'Empreendimento', 'Corretor', 'Regra Aplicada', 'Tipo Regra', 'Auditoria', 'Valor Comissão'];
+        
+        const rows = dadosRelatorio.map(item => [
+            item.lote || '',
+            item.cliente || '',
+            item.empreendimento || '',
+            item.corretor || '',
+            `${item.regra_nome || ''} - ${item.regra_descricao || ''}`,
+            item.tipo_regra === 'faturamento' ? 'Faturamento' : 'Gatilho',
+            item.auditoria_aprovada === true ? 'Aprovada' : (item.auditoria_aprovada === false ? 'Reprovada' : 'Pendente'),
+            item.valor_comissao || 0
+        ]);
+        
+        // Criar CSV
+        let csvContent = '\uFEFF'; // BOM para UTF-8
+        csvContent += headers.join(';') + '\n';
+        rows.forEach(row => {
+            csvContent += row.map(cell => {
+                // Escapar aspas e vírgulas
+                const cellStr = String(cell).replace(/"/g, '""');
+                return `"${cellStr}"`;
+            }).join(';') + '\n';
+        });
+        
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `relatorio_comissoes_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showAlert('Relatório exportado com sucesso!', 'success');
+    } catch (error) {
+        console.error('Erro ao exportar relatório:', error);
+        showAlert('Erro ao exportar relatório', 'error');
+    }
+};
+
+// Inicializar filtros quando a página de relatório for aberta
+document.addEventListener('DOMContentLoaded', function() {
+    // Observar mudança de página para carregar filtros
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'class') {
+                const relatorioPage = document.getElementById('relatorio-comissoes');
+                if (relatorioPage && relatorioPage.classList.contains('active')) {
+                    carregarFiltrosRelatorio();
+                }
+            }
+        });
+    });
+    
+    const relatorioPage = document.getElementById('relatorio-comissoes');
+    if (relatorioPage) {
+        observer.observe(relatorioPage, { attributes: true });
+    }
+});
 
 // Garantir que o DOM esta completamente carregado
 if (document.readyState === 'loading') {

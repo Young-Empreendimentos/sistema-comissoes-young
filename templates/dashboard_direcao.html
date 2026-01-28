@@ -7,148 +7,418 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        * {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: #0a0a0a;
+            min-height: 100vh;
+        }
+
+        /* Header moderno */
         .direcao-header {
-            background: linear-gradient(135deg, #323232 0%, #0D0D0D 100%);
-            border-bottom: 2px solid #FE5009;
+            background: linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(10, 10, 10, 0.98) 100%);
+            border-bottom: 1px solid rgba(254, 80, 9, 0.3);
+            backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .badge-direcao {
-            background: linear-gradient(135deg, #FE5009, #751900);
+            background: linear-gradient(135deg, #FE5009 0%, #ff7b3d 100%);
             color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            padding: 0.35rem 1rem;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 700;
             margin-left: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(254, 80, 9, 0.4);
         }
 
+        /* Container principal */
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Título da página */
+        .page-header {
+            margin-bottom: 2.5rem;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #ccc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-subtitle {
+            color: #666;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+
+        /* Cards de estatísticas */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1.5rem;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
         }
 
         .stat-card {
-            background: #323232;
-            border: 1px solid rgba(254, 80, 9, 0.2);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
+            background: linear-gradient(145deg, rgba(30, 30, 30, 0.9) 0%, rgba(20, 20, 20, 0.95) 100%);
+            border: 1px solid rgba(254, 80, 9, 0.15);
+            border-radius: 20px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #FE5009, #ff7b3d, #FE5009);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(254, 80, 9, 0.4);
+            box-shadow: 0 20px 40px rgba(254, 80, 9, 0.15);
+        }
+
+        .stat-card-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card-icon.pendente {
+            background: linear-gradient(135deg, rgba(254, 80, 9, 0.2), rgba(254, 80, 9, 0.05));
             color: #FE5009;
         }
 
-        .stat-label {
-            color: #D7D7D9;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
+        .stat-card-icon.valor {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05));
+            color: #10b981;
         }
 
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value.orange {
+            background: linear-gradient(135deg, #FE5009, #ff7b3d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-value.green {
+            background: linear-gradient(135deg, #10b981, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Barra de ações em lote */
         .acoes-lote {
             display: flex;
             gap: 1rem;
-            margin-bottom: 1.5rem;
-            padding: 1rem;
-            background: rgba(254, 80, 9, 0.1);
-            border: 1px solid rgba(254, 80, 9, 0.2);
-            border-radius: 8px;
+            margin-bottom: 2rem;
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, rgba(254, 80, 9, 0.1), rgba(254, 80, 9, 0.05));
+            border: 1px solid rgba(254, 80, 9, 0.25);
+            border-radius: 16px;
             align-items: center;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .acoes-lote.hidden {
             display: none;
         }
 
+        .selecionados-info {
+            flex: 1;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .selecionados-info strong {
+            color: #FE5009;
+            font-size: 1.25rem;
+        }
+
         .btn-aprovar {
-            background: linear-gradient(135deg, #10b981, #059669);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
+            padding: 0.875rem 2rem;
+            border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-family: inherit;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .btn-aprovar:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.35);
+        }
+
+        .btn-aprovar:active {
+            transform: translateY(0);
         }
 
         .btn-rejeitar {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
+            padding: 0.875rem 2rem;
+            border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-family: inherit;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .btn-rejeitar:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.35);
         }
 
-        .selecionados-info {
-            flex: 1;
-            color: #D7D7D9;
+        /* Container da tabela */
+        .table-container {
+            background: linear-gradient(145deg, rgba(25, 25, 25, 0.95) 0%, rgba(15, 15, 15, 0.98) 100%);
+            border: 1px solid rgba(254, 80, 9, 0.15);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         }
 
+        .table-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(254, 80, 9, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .table-title-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, rgba(254, 80, 9, 0.2), rgba(254, 80, 9, 0.05));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FE5009;
+            font-size: 1.2rem;
+        }
+
+        .btn-refresh {
+            background: transparent;
+            border: 1px solid rgba(254, 80, 9, 0.3);
+            color: #FE5009;
+            padding: 0.625rem 1.25rem;
+            border-radius: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-refresh:hover {
+            background: rgba(254, 80, 9, 0.1);
+            border-color: #FE5009;
+        }
+
+        /* Tabela moderna */
         .tabela-comissoes {
             width: 100%;
             border-collapse: collapse;
-            background: #323232;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .tabela-comissoes th {
-            background: #1a1a1a;
-            color: white;
-            padding: 1rem;
+            background: rgba(254, 80, 9, 0.08);
+            color: #999;
+            padding: 1rem 1.25rem;
             text-align: left;
             font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(254, 80, 9, 0.1);
         }
 
         .tabela-comissoes td {
-            padding: 1rem;
-            border-bottom: 1px solid rgba(254, 80, 9, 0.1);
-            color: #D7D7D9;
+            padding: 1.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: #e0e0e0;
+            font-size: 0.95rem;
         }
 
-        .tabela-comissoes tr:hover {
+        .tabela-comissoes tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        .tabela-comissoes tbody tr:hover {
             background: rgba(254, 80, 9, 0.05);
         }
 
-        .checkbox-direcao {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: #FE5009;
+        .tabela-comissoes tbody tr.selected {
+            background: rgba(254, 80, 9, 0.1);
         }
 
-        .gatilho-sim {
-            color: #10b981;
+        /* Checkbox customizado */
+        .checkbox-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .checkbox-direcao {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+            accent-color: #FE5009;
+            border-radius: 6px;
+        }
+
+        /* Badges de status */
+        .gatilho-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
             font-weight: 600;
         }
 
-        .gatilho-nao {
-            color: #ef4444;
+        .gatilho-badge.sim {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
-        /* Modal de Rejeicao */
+        .gatilho-badge.nao {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        /* Valor destacado */
+        .valor-cell {
+            font-weight: 700;
+            color: #10b981;
+        }
+
+        /* Nome do corretor */
+        .corretor-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .corretor-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #FE5009, #ff7b3d);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .corretor-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .corretor-nome {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .corretor-detalhe {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        /* Modal de Rejeição */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -156,7 +426,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
             z-index: 1000;
             align-items: center;
             justify-content: center;
@@ -164,76 +435,244 @@
 
         .modal-overlay.active {
             display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .modal-content {
-            background: #323232;
-            border-radius: 16px;
-            padding: 2rem;
+            background: linear-gradient(145deg, #1e1e1e, #151515);
+            border-radius: 24px;
+            padding: 2.5rem;
             width: 90%;
-            max-width: 500px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 520px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
             border: 1px solid rgba(254, 80, 9, 0.2);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
+            color: #ef4444;
         }
 
         .modal-title {
             font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
             color: #fff;
+            text-align: center;
+        }
+
+        .modal-subtitle {
+            color: #888;
+            text-align: center;
+            margin-bottom: 1.5rem;
         }
 
         .modal-textarea {
             width: 100%;
-            min-height: 120px;
-            padding: 1rem;
+            min-height: 140px;
+            padding: 1.25rem;
             border: 2px solid rgba(254, 80, 9, 0.2);
-            border-radius: 8px;
+            border-radius: 16px;
             font-family: inherit;
             font-size: 1rem;
             resize: vertical;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             background: rgba(0, 0, 0, 0.3);
             color: #fff;
+            transition: all 0.3s ease;
         }
 
         .modal-textarea:focus {
             outline: none;
             border-color: #FE5009;
+            box-shadow: 0 0 0 4px rgba(254, 80, 9, 0.1);
+        }
+
+        .modal-textarea::placeholder {
+            color: #555;
         }
 
         .modal-buttons {
             display: flex;
             gap: 1rem;
-            justify-content: flex-end;
+            justify-content: center;
         }
 
         .btn-cancelar {
-            background: #1a1a1a;
-            color: #D7D7D9;
-            border: 1px solid rgba(254, 80, 9, 0.2);
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
+            background: transparent;
+            color: #999;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.875rem 2rem;
+            border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
         }
 
+        .btn-cancelar:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        /* Loading state */
         .loading-direcao {
             text-align: center;
-            padding: 3rem;
-            color: #999;
+            padding: 5rem 2rem;
+            color: #666;
         }
 
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(254, 80, 9, 0.1);
+            border-top-color: #FE5009;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Estado vazio */
         .empty-state {
             text-align: center;
-            padding: 3rem;
-            color: #999;
+            padding: 5rem 2rem;
         }
 
         .empty-state-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
+            width: 100px;
+            height: 100px;
+            border-radius: 30px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 2rem;
+            font-size: 3rem;
             color: #10b981;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        /* Alerts */
+        #alerts {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease;
+            min-width: 300px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.9));
+            color: white;
+            border: 1px solid rgba(16, 185, 129, 0.5);
+        }
+
+        .alert-error {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9));
+            color: white;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(37, 99, 235, 0.9));
+            color: white;
+            border: 1px solid rgba(59, 130, 246, 0.5);
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 1rem;
+            }
+
+            .page-title {
+                font-size: 1.75rem;
+            }
+
+            .stat-value {
+                font-size: 2rem;
+            }
+
+            .acoes-lote {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .table-container {
+                border-radius: 16px;
+            }
+
+            .tabela-comissoes th,
+            .tabela-comissoes td {
+                padding: 0.75rem;
+                font-size: 0.85rem;
+            }
+
+            .corretor-avatar {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -250,7 +689,7 @@
                 <span class="badge-direcao">Direção</span>
             </div>
             <div class="header-actions">
-                <span style="color: white; margin-right: 1rem;">{{ user.nome_completo }}</span>
+                <span style="color: white; margin-right: 1rem; font-weight: 500;">{{ user.nome_completo }}</span>
                 <a href="{{ url_for('logout') }}" class="btn-sync">
                     <span>Sair</span>
                 </a>
@@ -258,25 +697,31 @@
         </div>
     </header>
 
-    <div class="container">
+    <div class="dashboard-container">
         <!-- Alerts -->
         <div id="alerts"></div>
 
-        <h1 style="margin-bottom: 2rem; color: #fff;">Comissões Pendentes de Aprovação</h1>
+        <!-- Header da página -->
+        <div class="page-header">
+            <h1 class="page-title">Comissões Pendentes de Aprovação</h1>
+            <p class="page-subtitle">Gerencie e aprove as comissões enviadas pelos corretores</p>
+        </div>
 
-        <!-- Estatisticas -->
+        <!-- Estatísticas -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-value" id="totalPendente">0</div>
+                <div class="stat-card-icon pendente"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+                <div class="stat-value orange" id="totalPendente">0</div>
                 <div class="stat-label">Total Pendente</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="valorTotal">R$ 0,00</div>
+                <div class="stat-card-icon valor"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+                <div class="stat-value green" id="valorTotal">R$ 0,00</div>
                 <div class="stat-label">Valor Total</div>
             </div>
         </div>
 
-        <!-- Acoes em Lote -->
+        <!-- Ações em Lote -->
         <div class="acoes-lote hidden" id="acoesLoteDirecao">
             <div class="selecionados-info">
                 <strong id="qtdSelecionadas">0</strong> comissões selecionadas
@@ -285,28 +730,37 @@
                 Aprovar Selecionadas
             </button>
             <button class="btn-rejeitar" onclick="abrirModalRejeitar()">
-                Rejeitar Selecionadas
+                <span>✕</span> Rejeitar Selecionadas
             </button>
         </div>
 
         <!-- Loading -->
         <div class="loading-direcao" id="loadingDirecao">
-            <div class="spinner"></div>
+            <div class="loading-spinner"></div>
             <p>Carregando comissões pendentes...</p>
         </div>
 
-        <!-- Tabela de Comissoes -->
-        <div id="tabelaContainer" style="display: none;">
+        <!-- Container da Tabela -->
+        <div class="table-container" id="tabelaContainer" style="display: none;">
+            <div class="table-header">
+                <div class="table-title">
+                    <span>Lista de Comissões</span>
+                </div>
+                <button class="btn-refresh" onclick="carregarComissoesPendentes()">
+                    <span>↻</span> Atualizar
+                </button>
+            </div>
             <table class="tabela-comissoes">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" class="checkbox-direcao" id="selecionarTodasDirecao" onchange="toggleTodasDirecao()"></th>
+                        <th style="width: 50px;">
+                            <input type="checkbox" class="checkbox-direcao" id="selecionarTodasDirecao" onchange="toggleTodasDirecao()">
+                        </th>
                         <th>Corretor</th>
                         <th>Empreendimento</th>
                         <th>Lote</th>
                         <th>Cliente</th>
                         <th>Valor</th>
-                        <th>Data</th>
                         <th>Gatilho</th>
                         <th>Data Envio</th>
                     </tr>
@@ -318,20 +772,24 @@
 
         <!-- Estado vazio -->
         <div id="emptyState" class="empty-state" style="display: none;">
-            <div class="empty-state-icon">OK</div>
-            <h3>Nenhuma comissão pendente de aprovação</h3>
-            <p>Todas as comissões já foram processadas.</p>
+            <div class="empty-state-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+            <h3>Tudo em dia!</h3>
+            <p>Não há comissões pendentes de aprovação no momento.</p>
         </div>
     </div>
 
-    <!-- Modal de Rejeicao -->
+    <!-- Modal de Rejeição -->
     <div class="modal-overlay" id="modalRejeitar">
         <div class="modal-content">
-            <h2 class="modal-title">Motivo da Rejeicao</h2>
-            <textarea class="modal-textarea" id="motivoRejeicao" placeholder="Informe o motivo da rejeicao..."></textarea>
+            <div class="modal-icon">✕</div>
+            <h2 class="modal-title">Rejeitar Comissões</h2>
+            <p class="modal-subtitle">Informe o motivo da rejeição para as comissões selecionadas</p>
+            <textarea class="modal-textarea" id="motivoRejeicao" placeholder="Digite o motivo da rejeição..."></textarea>
             <div class="modal-buttons">
                 <button class="btn-cancelar" onclick="fecharModalRejeitar()">Cancelar</button>
-                <button class="btn-rejeitar" onclick="confirmarRejeicao()">Confirmar Rejeicao</button>
+                <button class="btn-rejeitar" onclick="confirmarRejeicao()">
+                    <span>✕</span> Confirmar Rejeição
+                </button>
             </div>
         </div>
     </div>
@@ -339,3 +797,4 @@
     <script src="/static/js/direcao.js"></script>
 </body>
 </html>
+

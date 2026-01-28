@@ -29,6 +29,9 @@
                 <button class="nav-tab" data-page="visualizar-comissoes">Visualizar Comissões</button>
                 <button class="nav-tab" data-page="configuracoes">Configurações</button>
                 {% endif %}
+                {% if user.is_admin or user.perfil == 'Direção' or user.perfil == 'Gestor' %}
+                <button class="nav-tab" data-page="relatorio-comissoes">Relatório de Comissões</button>
+                {% endif %}
                 <button class="nav-tab" data-page="exportacoes">Exportações</button>
             </nav>
             <div class="header-actions">
@@ -356,6 +359,116 @@
             </div>
         </div>
 
+        <!-- Página: Relatório de Comissões (Gestor, Direção e Admin) -->
+        {% if user.is_admin or user.perfil == 'Direção' or user.perfil == 'Gestor' %}
+        <div id="relatorio-comissoes" class="page">
+            <div class="page-content">
+                <div class="card">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #333;">
+                        <div>
+                            <h2 class="card-title" style="margin-bottom: 0.25rem;">Relatório de Comissões</h2>
+                            <p class="card-subtitle" style="color: #888; font-size: 0.9rem;">Visualize todas as vendas com as regras de comissão aplicadas</p>
+                        </div>
+                        <button class="btn-export" onclick="exportarRelatorioComissoes('excel')" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #fff; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Exportar Excel
+                        </button>
+                    </div>
+
+                    <!-- Filtros do Relatório -->
+                    <div class="filtros-relatorio" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Empreendimento</label>
+                            <select id="filtroRelatorioEmpreendimento" class="form-select">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Corretor</label>
+                            <select id="filtroRelatorioCorretor" class="form-select">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Regra Aplicada</label>
+                            <select id="filtroRelatorioRegra" class="form-select">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Auditoria</label>
+                            <select id="filtroRelatorioAuditoria" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="sim">Aprovada</option>
+                                <option value="nao">Não Aprovada</option>
+                                <option value="pendente">Pendente</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                            <button class="btn-primary" onclick="carregarRelatorioComissoes()" style="flex: 1;">Buscar</button>
+                            <button class="btn-secondary" onclick="limparFiltrosRelatorio()" style="padding: 0.75rem;">Limpar</button>
+                        </div>
+                    </div>
+
+                    <!-- Resumo/Totalizadores -->
+                    <div id="resumoRelatorio" class="resumo-relatorio" style="display: none; margin-bottom: 1.5rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                            <div style="background: #1a1a1a; padding: 1.25rem; border-radius: 8px; border: 1px solid #333;">
+                                <p style="color: #888; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Total de Vendas</p>
+                                <p id="totalVendasRelatorio" style="font-size: 1.75rem; font-weight: 600; color: #fff;">0</p>
+                            </div>
+                            <div style="background: #1a1a1a; padding: 1.25rem; border-radius: 8px; border: 1px solid #333;">
+                                <p style="color: #888; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Total em Comissões</p>
+                                <p id="totalComissoesRelatorio" style="font-size: 1.75rem; font-weight: 600; color: #4ade80;">R$ 0,00</p>
+                            </div>
+                            <div style="background: #1a1a1a; padding: 1.25rem; border-radius: 8px; border: 1px solid #333;">
+                                <p style="color: #888; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Corretores</p>
+                                <p id="totalCorretoresRelatorio" style="font-size: 1.75rem; font-weight: 600; color: #fff;">0</p>
+                            </div>
+                            <div style="background: #1a1a1a; padding: 1.25rem; border-radius: 8px; border: 1px solid #333;">
+                                <p style="color: #888; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Auditorias Aprovadas</p>
+                                <p id="totalAuditoriasRelatorio" style="font-size: 1.75rem; font-weight: 600; color: #fff;">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading -->
+                    <div id="loadingRelatorio" class="loading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Carregando relatório...</p>
+                    </div>
+
+                    <!-- Tabela do Relatório -->
+                    <div id="tabelaRelatorioContainer" style="overflow-x: auto; border: 1px solid #333; border-radius: 8px;">
+                        <table class="tabela-relatorio" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #1a1a1a;">
+                                    <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Lote</th>
+                                    <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Cliente</th>
+                                    <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Empreendimento</th>
+                                    <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Corretor</th>
+                                    <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Regra Aplicada</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Auditoria</th>
+                                    <th style="padding: 1rem; text-align: right; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Valor Comissão</th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpoTabelaRelatorio">
+                                <tr><td colspan="7" style="text-align: center; padding: 4rem 2rem; color: #666;">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="margin-bottom: 1rem;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                    <p style="font-size: 0.95rem;">Clique em "Buscar" para carregar o relatório</p>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginação -->
+                    <div id="paginacaoRelatorio" style="display: none; margin-top: 1.5rem; display: flex; justify-content: center; gap: 0.5rem;">
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Página: Configurações (Admin Only) -->
         <div id="configuracoes" class="page">
             <div class="page-content">
@@ -365,10 +478,11 @@
                     </h2>
 
                     <!-- Sub-navegação -->
-                    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem;">
-                        <button class="btn-secondary" onclick="document.getElementById('configUsuarios').style.display='block'; document.getElementById('configCorretores').style.display='none'; document.getElementById('configEmails').style.display='none'; carregarUsuariosConfig();">Usuários</button>
-                        <button class="btn-secondary" onclick="document.getElementById('configUsuarios').style.display='none'; document.getElementById('configCorretores').style.display='block'; document.getElementById('configEmails').style.display='none'; carregarCorretoresConfig();">Corretores</button>
-                        <button class="btn-secondary" onclick="document.getElementById('configUsuarios').style.display='none'; document.getElementById('configCorretores').style.display='none'; document.getElementById('configEmails').style.display='block'; carregarConfiguracoesEmails();">E-mails</button>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; flex-wrap: wrap;">
+                        <button class="btn-secondary config-tab" data-config="configUsuarios" onclick="mostrarConfigTab('configUsuarios'); carregarUsuariosConfig();">Usuários</button>
+                        <button class="btn-secondary config-tab" data-config="configCorretores" onclick="mostrarConfigTab('configCorretores'); carregarCorretoresConfig();">Corretores</button>
+                        <button class="btn-secondary config-tab" data-config="configEmails" onclick="mostrarConfigTab('configEmails'); carregarConfiguracoesEmails();">E-mails</button>
+                        <button class="btn-secondary config-tab" data-config="configRegras" onclick="mostrarConfigTab('configRegras'); carregarRegrasComissao();">Regras de Comissão</button>
                         <button id="syncButton" class="btn-sync" style="margin-left: auto;">
                             <span>Sincronizar Dados</span>
                         </button>
@@ -403,6 +517,76 @@
                         <p style="margin-bottom: 1rem; color: #999;">Configure os destinatários de e-mails automáticos do sistema.</p>
                         <div id="configEmailsList">
                             <p>Carregando...</p>
+                        </div>
+                    </div>
+
+                    <!-- Config Regras de Comissão -->
+                    <div id="configRegras" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #333;">
+                            <div>
+                                <h3 style="margin-bottom: 0.25rem; font-weight: 600;">Regras de Comissão</h3>
+                                <p style="color: #888; font-size: 0.9rem;">Configure as regras de gatilho para cada empreendimento</p>
+                            </div>
+                            <button class="btn-primary" onclick="abrirModalNovaRegra()" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Nova Regra
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Regras -->
+                        <div style="overflow-x: auto; border: 1px solid #333; border-radius: 8px;">
+                            <table class="tabela-regras" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #1a1a1a;">
+                                        <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Nome</th>
+                                        <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Tipo</th>
+                                        <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Regra</th>
+                                        <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Descrição</th>
+                                        <th style="padding: 1rem; text-align: center; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Status</th>
+                                        <th style="padding: 1rem; text-align: center; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #333;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="corpoTabelaRegras">
+                                    <tr><td colspan="6" style="text-align: center; padding: 2rem; color: #666;">Carregando regras...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Legenda das Regras -->
+                        <div style="margin-top: 2rem; padding: 1.5rem; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+                            <h4 style="margin-bottom: 1rem; color: #fff; font-weight: 600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Tipos de Regras Suportadas</h4>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                                <div>
+                                    <h5 style="color: #4ade80; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 600;">Regra de Gatilho</h5>
+                                    <p style="color: #888; font-size: 0.85rem; margin-bottom: 0.75rem;">Baseada em percentual do valor à vista, com ou sem ITBI.</p>
+                                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <div style="padding: 0.5rem 0.75rem; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
+                                            <code style="color: #4ade80; font-size: 0.85rem;">10% + ITBI</code>
+                                            <span style="color: #666; font-size: 0.8rem;">10% do valor + ITBI</span>
+                                        </div>
+                                        <div style="padding: 0.5rem 0.75rem; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
+                                            <code style="color: #4ade80; font-size: 0.85rem;">5%</code>
+                                            <span style="color: #666; font-size: 0.8rem;">5% do valor à vista</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h5 style="color: #60a5fa; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 600;">Regra de Faturamento</h5>
+                                    <p style="color: #888; font-size: 0.85rem; margin-bottom: 0.75rem;">Baseada em valor mínimo de vendas (pode incluir vários lotes).</p>
+                                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <div style="padding: 0.5rem 0.75rem; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
+                                            <code style="color: #60a5fa; font-size: 0.85rem;">Mín. R$ 120.000 → 5%</code>
+                                            <span style="color: #666; font-size: 0.8rem;">Comissão se atingir meta</span>
+                                        </div>
+                                        <div style="padding: 0.5rem 0.75rem; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
+                                            <code style="color: #fbbf24; font-size: 0.85rem;">+ 1% Auditoria</code>
+                                            <span style="color: #666; font-size: 0.8rem;">Bônus extra se passar</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -514,6 +698,119 @@
                     <button type="submit" class="btn-primary">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal Regra de Comissão -->
+    <div id="modalRegra" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="tituloModalRegra">Nova Regra de Comissão</h3>
+                <button class="modal-close" onclick="fecharModalRegra()">&times;</button>
+            </div>
+            <form id="formRegra" onsubmit="salvarRegra(event)">
+                <input type="hidden" id="regraId">
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="regraNome" style="display: block; margin-bottom: 0.5rem; color: #ccc;">Nome da Regra *</label>
+                    <input type="text" id="regraNome" required placeholder="Ex: Regra Padrão, Aurora, Montecarlo..." style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fff;">
+                </div>
+                
+                <!-- Tipo de Regra -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #ccc;">Tipo de Regra *</label>
+                    <div style="display: flex; gap: 1.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; color: #ccc; cursor: pointer;">
+                            <input type="radio" name="tipoRegra" value="gatilho" checked onchange="toggleTipoRegra()" style="width: 18px; height: 18px;"> 
+                            <span>Gatilho (% do valor + ITBI)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; color: #ccc; cursor: pointer;">
+                            <input type="radio" name="tipoRegra" value="faturamento" onchange="toggleTipoRegra()" style="width: 18px; height: 18px;"> 
+                            <span>Faturamento Mínimo</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Campos para regra de GATILHO -->
+                <div id="camposGatilho">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="regraPercentual" style="display: block; margin-bottom: 0.5rem; color: #ccc;">Percentual (%) *</label>
+                            <input type="number" id="regraPercentual" min="0.1" max="100" step="0.1" value="10" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fff;">
+                        </div>
+                        <div class="form-group" style="flex: 1; display: flex; align-items: flex-end; padding-bottom: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; color: #ccc; cursor: pointer;">
+                                <input type="checkbox" id="regraIncluiItbi" checked style="width: 18px; height: 18px;"> 
+                                <span>Incluir ITBI</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Campos para regra de FATURAMENTO -->
+                <div id="camposFaturamento" style="display: none;">
+                    <div style="background: #1a1a1a; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #333;">
+                        <p style="color: #888; font-size: 0.85rem; margin-bottom: 1rem;">
+                            Regra de faturamento: se o corretor vender o valor mínimo (pode incluir um ou mais lotes), terá direito ao percentual de comissão.
+                        </p>
+                        
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="regraFaturamentoMinimo" style="display: block; margin-bottom: 0.5rem; color: #ccc; font-size: 0.85rem;">Faturamento Mínimo (R$) *</label>
+                                <input type="number" id="regraFaturamentoMinimo" min="0" step="1000" value="120000" placeholder="120000" style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff;">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="regraPercentualFaturamento" style="display: block; margin-bottom: 0.5rem; color: #ccc; font-size: 0.85rem;">Percentual Comissão (%) *</label>
+                                <input type="number" id="regraPercentualFaturamento" min="0.1" max="100" step="0.1" value="5" style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff;">
+                            </div>
+                        </div>
+                        
+                        <!-- Auditoria -->
+                        <div style="border-top: 1px solid #333; padding-top: 1rem; margin-top: 0.5rem;">
+                            <p style="color: #fff; font-size: 0.85rem; margin-bottom: 0.75rem; font-weight: 500;">
+                                Bônus por Auditoria
+                            </p>
+                            <div style="display: flex; gap: 1rem; align-items: flex-end;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label for="regraPercentualAuditoria" style="display: block; margin-bottom: 0.5rem; color: #ccc; font-size: 0.85rem;">Percentual Extra se Passar na Auditoria (%)</label>
+                                    <input type="number" id="regraPercentualAuditoria" min="0" max="100" step="0.1" value="1" placeholder="1" style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff;">
+                                </div>
+                            </div>
+                            <p style="color: #666; font-size: 0.8rem; margin-top: 0.5rem;">
+                                Se atingir as auditorias, o corretor terá direito a este percentual adicional.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="regraDescricao" style="display: block; margin-bottom: 0.5rem; color: #ccc;">Descrição</label>
+                    <textarea id="regraDescricao" rows="2" placeholder="Descrição opcional da regra..." style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fff; resize: vertical;"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+                    <button type="button" class="btn-secondary" onclick="fecharModalRegra()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Confirmação Exclusão -->
+    <div id="modalConfirmacaoExclusao" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Confirmar Exclusão</h3>
+                <button class="modal-close" onclick="fecharModalConfirmacao()">&times;</button>
+            </div>
+            <div style="padding: 1rem 0;">
+                <p style="color: #ccc;">Tem certeza que deseja excluir esta regra de comissão?</p>
+                <p style="color: #999; font-size: 0.9rem; margin-top: 0.5rem;">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="btn-secondary" onclick="fecharModalConfirmacao()">Cancelar</button>
+                <button type="button" class="btn-danger" onclick="confirmarExclusaoRegra()" style="background: #dc2626; border-color: #dc2626;">Excluir</button>
+            </div>
         </div>
     </div>
 
