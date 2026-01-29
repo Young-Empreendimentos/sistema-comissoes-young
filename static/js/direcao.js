@@ -5,6 +5,8 @@
 
 // Estado global
 let comissoesSelecionadasDirecao = [];
+let observacoesComissoes = {}; // Armazena observações por ID de comissão
+let comissaoAtualObservacao = null; // ID da comissão sendo editada
 
 // ==================== FUNÇÕES UTILITÁRIAS ====================
 
@@ -157,6 +159,14 @@ function renderizarTabelaComissoesDirecao(comissoes) {
                 <td class="valor-cell">${formatCurrency(comissao.valor_comissao || comissao.commission_value)}</td>
                 <td><span class="gatilho-badge ${gatilhoClass}">${gatilhoText}</span></td>
                 <td>${formatDate(comissao.data_envio_aprovacao)}</td>
+                <td style="text-align: center;">
+                    <button 
+                        class="btn-observacao ${observacoesComissoes[comissao.id] ? 'tem-observacao' : ''}" 
+                        onclick="abrirModalObservacao(${comissao.id}, '${nomeCorretor}', '${comissao.unit_name || '-'}')"
+                        title="Adicionar observações para o financeiro">
+                        💬
+                    </button>
+                </td>
             </tr>
         `;
     }).join('');
@@ -252,11 +262,20 @@ async function aprovarComissoesSelecionadas() {
     btnAprovar.disabled = true;
     
     try {
+        // Preparar observações das comissões selecionadas
+        const observacoes = {};
+        comissoesSelecionadasDirecao.forEach(id => {
+            if (observacoesComissoes[id]) {
+                observacoes[id] = observacoesComissoes[id];
+            }
+        });
+        
         const response = await fetch('/api/comissoes/aprovar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                comissoes_ids: comissoesSelecionadasDirecao
+                comissoes_ids: comissoesSelecionadasDirecao,
+                observacoes: observacoes
             })
         });
         
@@ -315,12 +334,21 @@ async function confirmarRejeicao() {
     btnConfirmar.disabled = true;
     
     try {
+        // Preparar observações das comissões selecionadas
+        const observacoes = {};
+        comissoesSelecionadasDirecao.forEach(id => {
+            if (observacoesComissoes[id]) {
+                observacoes[id] = observacoesComissoes[id];
+            }
+        });
+        
         const response = await fetch('/api/comissoes/rejeitar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 comissoes_ids: comissoesSelecionadasDirecao,
-                motivo: motivo
+                motivo: motivo,
+                observacoes: observacoes
             })
         });
         
@@ -344,28 +372,286 @@ async function confirmarRejeicao() {
     }
 }
 
+// ==================== OBSERVAÇÕES ====================
+
+function abrirModalObservacao(comissaoId, nomeCorretor, lote) {
+    comissaoAtualObservacao = comissaoId;
+    const modal = document.getElementById('modalObservacao');
+    const textarea = document.getElementById('textareaObservacao');
+    const info = document.getElementById('infoComissaoModal');
+    
+    // Preencher informações da comissão
+    info.innerHTML = `<strong>Corretor:</strong> ${nomeCorretor} | <strong>Lote:</strong> ${lote}`;
+    
+    // Carregar observação existente se houver
+    textarea.value = observacoesComissoes[comissaoId] || '';
+    
+    modal.classList.add('active');
+    setTimeout(() => textarea.focus(), 100);
+}
+
+function fecharModalObservacao() {
+    const modal = document.getElementById('modalObservacao');
+    modal.classList.remove('active');
+    comissaoAtualObservacao = null;
+}
+
+function salvarObservacao() {
+    if (!comissaoAtualObservacao) return;
+    
+    const textarea = document.getElementById('textareaObservacao');
+    const observacao = textarea.value.trim();
+    
+    if (observacao) {
+        observacoesComissoes[comissaoAtualObservacao] = observacao;
+        showAlert('Observação salva! Será enviada ao financeiro.', 'success');
+    } else {
+        // Remove observação se o campo estiver vazio
+        delete observacoesComissoes[comissaoAtualObservacao];
+    }
+    
+    // Atualizar visual do botão
+    const btn = document.querySelector(`.btn-observacao[onclick*="${comissaoAtualObservacao}"]`);
+    if (btn) {
+        if (observacao) {
+            btn.classList.add('tem-observacao');
+        } else {
+            btn.classList.remove('tem-observacao');
+        }
+    }
+    
+    fecharModalObservacao();
+}
+
+// ==================== NAVEGAÇÃO ENTRE ABAS ====================
+
+function setupNavegacaoDirecao() {
+    const tabs = document.querySelectorAll('.nav-tab-direcao');
+    const pages = document.querySelectorAll('.page-direcao');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const pageName = this.dataset.page;
+            
+            // Atualizar abas ativas
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Atualizar páginas ativas
+            pages.forEach(p => p.classList.remove('active'));
+            const targetPage = document.getElementById(`page-${pageName}`);
+            if (targetPage) {
+                targetPage.classList.add('active');
+                
+                // Carregar conteúdo específico da página
+                if (pageName === 'relatorio') {
+                    carregarRelatorioComissoesDir();
+                }
+            }
+        });
+    });
+}
+
+async function carregarFiltrosRelatorioDir() {
+    try {
+        // Carregar empreendimentos
+        const respEmp = await fetch('/api/empreendimentos');
+        const empreendimentos = await respEmp.json();
+        const selectEmp = document.getElementById('filtroEmpreendimentoDir');
+        if (selectEmp && empreendimentos) {
+            selectEmp.innerHTML = '<option value="">Todos</option>' + 
+                empreendimentos.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+        }
+        
+        // Carregar corretores
+        const respCorr = await fetch('/api/relatorio-comissoes/corretores');
+        const corretores = await respCorr.json();
+        const selectCorr = document.getElementById('filtroCorretorDir');
+        if (selectCorr && corretores && Array.isArray(corretores)) {
+            selectCorr.innerHTML = '<option value="">Todos</option>' + 
+                corretores.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+        }
+        
+        // Carregar regras
+        const respRegras = await fetch('/api/regras-gatilho');
+        const regras = await respRegras.json();
+        const selectRegra = document.getElementById('filtroRegraDir');
+        if (selectRegra && regras) {
+            selectRegra.innerHTML = '<option value="">Todas</option>' + 
+                regras.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar filtros:', error);
+    }
+}
+
+function carregarRelatorioComissoesDir() {
+    carregarFiltrosRelatorioDir();
+    buscarRelatorioDir();
+}
+
+function buscarRelatorioDir() {
+    const container = document.getElementById('conteudoRelatorio');
+    if (!container) return;
+    
+    // Mostrar loading
+    container.innerHTML = `
+        <div style="text-align: center; padding: 4rem; color: #999;">
+            <div class="loading-spinner" style="margin: 0 auto 1.5rem;"></div>
+            <p>Carregando relatório...</p>
+        </div>
+    `;
+    
+    // Montar URL com filtros
+    let url = '/api/relatorio-comissoes?';
+    
+    const empreendimento = document.getElementById('filtroEmpreendimentoDir')?.value;
+    const corretor = document.getElementById('filtroCorretorDir')?.value;
+    const regra = document.getElementById('filtroRegraDir')?.value;
+    const auditoria = document.getElementById('filtroAuditoriaDir')?.value;
+    
+    if (empreendimento) url += `empreendimento_id=${empreendimento}&`;
+    if (corretor) url += `corretor_id=${corretor}&`;
+    if (regra) url += `regra_id=${regra}&`;
+    if (auditoria) url += `auditoria=${auditoria}&`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            renderizarRelatorioDir(data);
+        })
+        .catch(error => {
+            console.error('Erro ao carregar relatório:', error);
+            container.innerHTML = `
+                <div style="text-align: center; padding: 4rem; color: #f87171;">
+                    <p>Erro ao carregar relatório.</p>
+                </div>
+            `;
+        });
+}
+
+function limparFiltrosDir() {
+    document.getElementById('filtroEmpreendimentoDir').value = '';
+    document.getElementById('filtroCorretorDir').value = '';
+    document.getElementById('filtroRegraDir').value = '';
+    document.getElementById('filtroAuditoriaDir').value = '';
+    buscarRelatorioDir();
+}
+
+function renderizarRelatorioDir(data) {
+    const container = document.getElementById('conteudoRelatorio');
+    if (!container) return;
+    
+    // A API retorna 'dados', não 'vendas'
+    const vendas = data.dados || [];
+    const resumo = data.resumo || {};
+    
+    if (vendas.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 4rem; color: #999;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5" style="margin-bottom: 1rem;">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+                <p style="font-size: 1.1rem; margin-top: 1rem;">Nenhuma venda encontrada</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const linhasHTML = vendas.map(v => {
+        // Formatar regra aplicada
+        const regraTexto = v.regra_descricao || v.regra_nome || '-';
+        
+        return `
+        <tr>
+            <td style="padding: 1rem; border-bottom: 1px solid #333;">${v.lote || '-'}</td>
+            <td style="padding: 1rem; border-bottom: 1px solid #333;">${corrigirEspacamentoNome(v.cliente) || '-'}</td>
+            <td style="padding: 1rem; border-bottom: 1px solid #333;">${v.empreendimento || '-'}</td>
+            <td style="padding: 1rem; border-bottom: 1px solid #333;">${corrigirEspacamentoNome(v.corretor) || '-'}</td>
+            <td style="padding: 1rem; border-bottom: 1px solid #333;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <span style="font-weight: 600; color: #FE5009;">${v.regra_nome || 'Não definida'}</span>
+                    <span style="font-size: 0.85rem; color: #888;">${regraTexto}</span>
+                </div>
+            </td>
+            <td style="padding: 1rem; border-bottom: 1px solid #333; text-align: center;">
+                ${v.auditoria_aprovada ? '<span style="color: #4ade80; font-size: 1.2rem;">✓</span>' : '<span style="color: #666;">-</span>'}
+            </td>
+            <td style="padding: 1rem; border-bottom: 1px solid #333; text-align: right; font-weight: 600; color: #4ade80;">
+                ${formatCurrency(v.valor_comissao)}
+            </td>
+        </tr>
+    `}).join('');
+    
+    container.innerHTML = `
+        <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <h3 style="color: #fff; font-size: 1.2rem; margin-bottom: 0.5rem;">Total de Vendas: ${resumo.total_vendas || vendas.length}</h3>
+                    <p style="color: #888; font-size: 0.9rem;">Total em Comissões: ${formatCurrency(resumo.total_comissoes || 0)}</p>
+                    <p style="color: #888; font-size: 0.85rem;">Corretores: ${resumo.total_corretores || 0} | Auditorias Aprovadas: ${resumo.auditorias_aprovadas || 0}</p>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto; border: 1px solid #333; border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #0a0a0a;">
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #333;">Lote</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #333;">Cliente</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #333;">Empreendimento</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #333;">Corretor</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #333;">Regra Aplicada</th>
+                            <th style="padding: 1rem; text-align: center; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #333;">Auditoria</th>
+                            <th style="padding: 1rem; text-align: right; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #333;">Valor Comissão</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${linhasHTML}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
 // ==================== INICIALIZAÇÃO ====================
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Setup navegação
+    setupNavegacaoDirecao();
+    
+    // Carregar comissões pendentes
     carregarComissoesPendentes();
     
-    // Fechar modal ao clicar fora
+    // Fechar modais ao clicar fora
     document.getElementById('modalRejeitar').addEventListener('click', function(e) {
         if (e.target === this) {
             fecharModalRejeitar();
         }
     });
     
-    // Fechar modal com ESC
+    document.getElementById('modalObservacao').addEventListener('click', function(e) {
+        if (e.target === this) {
+            fecharModalObservacao();
+        }
+    });
+    
+    // Fechar modais com ESC
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             fecharModalRejeitar();
+            fecharModalObservacao();
         }
     });
     
     // Auto-refresh a cada 60 segundos
-    setInterval(() => {
-        if (!document.getElementById('modalRejeitar').classList.contains('active')) {
+    setInterval(function() {
+        if (!document.getElementById('modalRejeitar').classList.contains('active') && 
+            !document.getElementById('modalObservacao').classList.contains('active')) {
             carregarComissoesPendentes();
         }
     }, 60000);

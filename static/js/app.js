@@ -11,6 +11,8 @@ let comissoesSelecionadas = [];
 let dadosEmpreendimentos = [];
 let dadosCorretores = [];
 let dadosContratos = [];
+let observacoesComissoes = {}; // Armazena observações por ID de comissão
+let comissaoAtualObservacao = null; // ID da comissão sendo editada
 
 // ================================
 // UTILITÁRIOS
@@ -730,6 +732,16 @@ function renderizarTabelaComissoes(comissoes) {
                 <td>${formatCurrency(c.valor_gatilho)}</td>
                 <td class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
                 <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacao}</span></td>
+                <td style="text-align: center;">
+                    ${isPendente ? `
+                        <button 
+                            class="btn-observacao ${observacoesComissoes[c.id] ? 'tem-observacao' : ''}" 
+                            onclick="abrirModalObservacaoComissao(${c.id}, '${corrigirEspacamentoNome(c.broker_nome)}', '${c.unit_name || '-'}')"
+                            title="Adicionar observações para a direção">
+                            💬
+                        </button>
+                    ` : '-'}
+                </td>
             </tr>
         `;
     }).join('');
@@ -813,6 +825,57 @@ function atualizarAcoesLote() {
     }
 }
 
+// ==================== OBSERVAÇÕES PARA DIREÇÃO ====================
+
+window.abrirModalObservacaoComissao = function(comissaoId, nomeCorretor, lote) {
+    comissaoAtualObservacao = comissaoId;
+    const modal = document.getElementById('modalObservacaoComissao');
+    const textarea = document.getElementById('textareaObservacaoComissao');
+    const info = document.getElementById('infoComissaoModalObs');
+    
+    // Preencher informações da comissão
+    info.innerHTML = `<strong>Corretor:</strong> ${nomeCorretor} | <strong>Lote:</strong> ${lote}`;
+    
+    // Carregar observação existente se houver
+    textarea.value = observacoesComissoes[comissaoId] || '';
+    
+    modal.classList.add('active');
+    setTimeout(() => textarea.focus(), 100);
+};
+
+window.fecharModalObservacaoComissao = function() {
+    const modal = document.getElementById('modalObservacaoComissao');
+    modal.classList.remove('active');
+    comissaoAtualObservacao = null;
+};
+
+window.salvarObservacaoComissao = function() {
+    if (!comissaoAtualObservacao) return;
+    
+    const textarea = document.getElementById('textareaObservacaoComissao');
+    const observacao = textarea.value.trim();
+    
+    if (observacao) {
+        observacoesComissoes[comissaoAtualObservacao] = observacao;
+        showAlert('Observação salva! Será enviada à direção.', 'success');
+    } else {
+        // Remove observação se o campo estiver vazio
+        delete observacoesComissoes[comissaoAtualObservacao];
+    }
+    
+    // Atualizar visual do botão
+    const btn = document.querySelector(`.btn-observacao[onclick*="${comissaoAtualObservacao}"]`);
+    if (btn) {
+        if (observacao) {
+            btn.classList.add('tem-observacao');
+        } else {
+            btn.classList.remove('tem-observacao');
+        }
+    }
+    
+    fecharModalObservacaoComissao();
+};
+
 async function enviarParaAprovacao() {
     if (comissoesSelecionadas.length === 0) {
         showAlert('Selecione ao menos uma comissão', 'error');
@@ -824,10 +887,21 @@ async function enviarParaAprovacao() {
     }
     
     try {
+        // Preparar observações das comissões selecionadas
+        const observacoes = {};
+        comissoesSelecionadas.forEach(id => {
+            if (observacoesComissoes[id]) {
+                observacoes[id] = observacoesComissoes[id];
+            }
+        });
+        
         const response = await fetch('/api/comissoes/enviar-aprovacao', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ comissoes_ids: comissoesSelecionadas })
+            body: JSON.stringify({ 
+                comissoes_ids: comissoesSelecionadas,
+                observacoes: observacoes
+            })
         });
         
         const data = await response.json();
@@ -1159,6 +1233,21 @@ document.addEventListener('click', (e) => {
     const modalConfirmacao = document.getElementById('modalConfirmacaoExclusao');
     if (e.target === modalConfirmacao) {
         fecharModalConfirmacao();
+    }
+    
+    const modalObsComissao = document.getElementById('modalObservacaoComissao');
+    if (e.target === modalObsComissao) {
+        fecharModalObservacaoComissao();
+    }
+});
+
+// Fechar modais com ESC
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modalObsComissao = document.getElementById('modalObservacaoComissao');
+        if (modalObsComissao && modalObsComissao.classList.contains('active')) {
+            fecharModalObservacaoComissao();
+        }
     }
 });
 

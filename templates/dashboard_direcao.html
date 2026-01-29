@@ -28,6 +28,48 @@
             z-index: 100;
         }
 
+        /* Navegação por abas */
+        .nav-tabs-direcao {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0 2rem;
+            background: rgba(10, 10, 10, 0.5);
+            border-bottom: 1px solid rgba(254, 80, 9, 0.2);
+        }
+
+        .nav-tab-direcao {
+            padding: 1rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: #999;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+            position: relative;
+        }
+
+        .nav-tab-direcao:hover {
+            color: #FE5009;
+            background: rgba(254, 80, 9, 0.05);
+        }
+
+        .nav-tab-direcao.active {
+            color: #FE5009;
+            border-bottom-color: #FE5009;
+            background: rgba(254, 80, 9, 0.1);
+        }
+
+        /* Páginas */
+        .page-direcao {
+            display: none;
+        }
+
+        .page-direcao.active {
+            display: block;
+        }
+
         .badge-direcao {
             background: linear-gradient(135deg, #FE5009 0%, #ff7b3d 100%);
             color: white;
@@ -352,6 +394,171 @@
             cursor: pointer;
             accent-color: #FE5009;
             border-radius: 6px;
+        }
+
+        /* Botão de observações */
+        .btn-observacao {
+            background: rgba(254, 80, 9, 0.1);
+            border: 1px solid rgba(254, 80, 9, 0.3);
+            color: #FE5009;
+            padding: 0.4rem 0.6rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-observacao:hover {
+            background: rgba(254, 80, 9, 0.2);
+            border-color: #FE5009;
+            transform: scale(1.05);
+        }
+
+        .btn-observacao.tem-observacao {
+            background: rgba(254, 80, 9, 0.3);
+            border-color: #FE5009;
+        }
+
+        /* Modal de observações */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, rgba(30, 30, 30, 0.98) 0%, rgba(20, 20, 20, 0.99) 100%);
+            border: 1px solid rgba(254, 80, 9, 0.3);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            animation: slideUp 0.3s ease;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: #FE5009;
+        }
+
+        .modal-body {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-info {
+            background: rgba(254, 80, 9, 0.1);
+            border-left: 3px solid #FE5009;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .observacao-textarea {
+            width: 100%;
+            min-height: 120px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1rem;
+            color: #fff;
+            font-size: 0.95rem;
+            resize: vertical;
+            transition: all 0.2s;
+        }
+
+        .observacao-textarea:focus {
+            outline: none;
+            border-color: #FE5009;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn-modal {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-modal-cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-modal-save {
+            background: linear-gradient(135deg, #FE5009, #ff7b3d);
+            color: white;
+        }
+
+        .btn-modal-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(254, 80, 9, 0.4);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Badges de status */
@@ -697,25 +904,33 @@
         </div>
     </header>
 
+    <!-- Navegação por Abas -->
+    <nav class="nav-tabs-direcao">
+        <button class="nav-tab-direcao active" data-page="pendentes">Comissões Pendentes</button>
+        <button class="nav-tab-direcao" data-page="relatorio">Relatório de Comissões</button>
+    </nav>
+
     <div class="dashboard-container">
         <!-- Alerts -->
         <div id="alerts"></div>
 
-        <!-- Header da página -->
-        <div class="page-header">
-            <h1 class="page-title">Comissões Pendentes de Aprovação</h1>
-            <p class="page-subtitle">Gerencie e aprove as comissões enviadas pelos corretores</p>
-        </div>
+        <!-- Página: Comissões Pendentes -->
+        <div id="page-pendentes" class="page-direcao active">
+            <!-- Header da página -->
+            <div class="page-header">
+                <h1 class="page-title">Comissões Pendentes de Aprovação</h1>
+                <p class="page-subtitle">Gerencie e aprove as comissões enviadas pelos corretores</p>
+            </div>
 
         <!-- Estatísticas -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-card-icon pendente"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+                <div class="stat-card-icon pendente">📋</div>
                 <div class="stat-value orange" id="totalPendente">0</div>
                 <div class="stat-label">Total Pendente</div>
             </div>
             <div class="stat-card">
-                <div class="stat-card-icon valor"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+                <div class="stat-card-icon valor">💰</div>
                 <div class="stat-value green" id="valorTotal">R$ 0,00</div>
                 <div class="stat-label">Valor Total</div>
             </div>
@@ -727,7 +942,7 @@
                 <strong id="qtdSelecionadas">0</strong> comissões selecionadas
             </div>
             <button class="btn-aprovar" onclick="aprovarComissoesSelecionadas()">
-                Aprovar Selecionadas
+                <span>✓</span> Aprovar Selecionadas
             </button>
             <button class="btn-rejeitar" onclick="abrirModalRejeitar()">
                 <span>✕</span> Rejeitar Selecionadas
@@ -744,6 +959,7 @@
         <div class="table-container" id="tabelaContainer" style="display: none;">
             <div class="table-header">
                 <div class="table-title">
+                    <div class="table-title-icon">📊</div>
                     <span>Lista de Comissões</span>
                 </div>
                 <button class="btn-refresh" onclick="carregarComissoesPendentes()">
@@ -763,6 +979,7 @@
                         <th>Valor</th>
                         <th>Gatilho</th>
                         <th>Data Envio</th>
+                        <th style="width: 80px;">Observações</th>
                     </tr>
                 </thead>
                 <tbody id="corpoTabelaDirecao">
@@ -772,11 +989,71 @@
 
         <!-- Estado vazio -->
         <div id="emptyState" class="empty-state" style="display: none;">
-            <div class="empty-state-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+            <div class="empty-state-icon">✓</div>
             <h3>Tudo em dia!</h3>
             <p>Não há comissões pendentes de aprovação no momento.</p>
         </div>
     </div>
+
+        </div>
+        <!-- Fim Página: Comissões Pendentes -->
+
+        <!-- Página: Relatório de Comissões -->
+        <div id="page-relatorio" class="page-direcao">
+            <div class="page-header">
+                <h1 class="page-title">Relatório de Comissões</h1>
+                <p class="page-subtitle">Visualize todas as vendas com as regras de comissão aplicadas</p>
+            </div>
+
+            <!-- Filtros -->
+            <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                <h3 style="color: #fff; font-size: 1rem; margin-bottom: 1rem; font-weight: 600;">Filtros</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div>
+                        <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Empreendimento</label>
+                        <select id="filtroEmpreendimentoDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Corretor</label>
+                        <select id="filtroCorretorDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Regra de Comissão</label>
+                        <select id="filtroRegraDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Auditoria</label>
+                        <select id="filtroAuditoriaDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
+                            <option value="">Todas</option>
+                            <option value="sim">Aprovada</option>
+                            <option value="nao">Não Aprovada</option>
+                            <option value="pendente">Pendente</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button onclick="buscarRelatorioDir()" style="padding: 0.75rem 2rem; background: linear-gradient(135deg, #FE5009, #ff7b3d); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                        Buscar
+                    </button>
+                    <button onclick="limparFiltrosDir()" style="padding: 0.75rem 2rem; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid #444; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                        Limpar Filtros
+                    </button>
+                </div>
+            </div>
+
+            <!-- Conteúdo do Relatório será carregado aqui pelo JavaScript -->
+            <div id="conteudoRelatorio"></div>
+        </div>
+        <!-- Fim Página: Relatório -->
+
+    </div>
+    <!-- Fim dashboard-container -->
 
     <!-- Modal de Rejeição -->
     <div class="modal-overlay" id="modalRejeitar">
@@ -790,6 +1067,27 @@
                 <button class="btn-rejeitar" onclick="confirmarRejeicao()">
                     <span>✕</span> Confirmar Rejeição
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Observações -->
+    <div id="modalObservacao" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">✍️ Observações para o Financeiro</h3>
+                <button class="modal-close" onclick="fecharModalObservacao()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-info" id="infoComissaoModal"></div>
+                <textarea 
+                    id="textareaObservacao" 
+                    class="observacao-textarea" 
+                    placeholder="Digite observações que serão enviadas por e-mail ao financeiro..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal btn-modal-cancel" onclick="fecharModalObservacao()">Cancelar</button>
+                <button class="btn-modal btn-modal-save" onclick="salvarObservacao()">Salvar</button>
             </div>
         </div>
     </div>

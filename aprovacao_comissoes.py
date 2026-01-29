@@ -60,12 +60,14 @@ class AprovacaoComissoes:
                 return ['suelen@youngempreendimentos.com.br', 'lais@youngempreendimentos.com.br']
             return []
     
-    def enviar_para_aprovacao(self, comissoes_ids: List[int], usuario_id: int) -> Dict:
+    def enviar_para_aprovacao(self, comissoes_ids: List[int], usuario_id: int, observacoes: Optional[Dict] = None) -> Dict:
         """
         Envia um lote de comissões para aprovação da direção
         Garante envio de UM ÚNICO e-mail consolidado
+        observacoes: Dict com {comissao_id: texto_observacao} enviadas pelo corretor/gestor
         """
         try:
+            observacoes = observacoes or {}
             # 1. Validar que as comissões existem e estão pendentes
             comissoes = []
             valor_total = 0
@@ -110,13 +112,24 @@ class AprovacaoComissoes:
             
             # 3. Atualizar status das comissões
             for comissao in comissoes:
+                # Pegar observação específica desta comissão
+                observacao_comissao = observacoes.get(str(comissao['id']), observacoes.get(comissao['id']))
+                
+                # Adicionar observação ao objeto comissão para o e-mail
+                if observacao_comissao:
+                    comissao['observacoes_corretor'] = observacao_comissao
+                
                 # Atualizar status - tentar com todos os campos, se falhar tentar só com status
                 try:
-                    self.supabase.table('sienge_comissoes').update({
+                    update_data = {
                         'status_aprovacao': self.STATUS_PENDENTE_APROVACAO,
                         'data_envio_aprovacao': datetime.now().isoformat(),
                         'enviado_por': usuario_id
-                    }).eq('id', comissao['id']).execute()
+                    }
+                    if observacao_comissao:
+                        update_data['observacoes_corretor'] = observacao_comissao
+                    
+                    self.supabase.table('sienge_comissoes').update(update_data).eq('id', comissao['id']).execute()
                 except Exception as e:
                     print(f"Erro com campos extras, tentando apenas status: {str(e)}")
                     try:
@@ -176,13 +189,15 @@ class AprovacaoComissoes:
                 'mensagem': f'Erro: {str(e)}'
             }
     
-    def aprovar_comissoes(self, comissoes_ids: List[int], usuario_id: int, observacoes: Optional[str] = None) -> Dict:
+    def aprovar_comissoes(self, comissoes_ids: List[int], usuario_id: int, observacoes: Optional[Dict] = None) -> Dict:
         """
         Aprova comissões (ação da direção)
         Envia notificação para o financeiro
+        observacoes: Dict com {comissao_id: texto_observacao}
         """
         try:
             comissoes_aprovadas = []
+            observacoes = observacoes or {}
             
             for comissao_id in comissoes_ids:
                 # Validar que está pendente de aprovação
@@ -194,13 +209,20 @@ class AprovacaoComissoes:
                 if response.data and len(response.data) > 0:
                     comissao = response.data[0]
                     
+                    # Pegar observação específica desta comissão
+                    observacao_comissao = observacoes.get(str(comissao_id), observacoes.get(comissao_id))
+                    
                     # Atualizar status
                     self.supabase.table('sienge_comissoes').update({
                         'status_aprovacao': self.STATUS_APROVADA,
                         'data_aprovacao': datetime.now().isoformat(),
                         'aprovado_por': usuario_id,
-                        'observacoes': observacoes
+                        'observacoes_direcao': observacao_comissao
                     }).eq('id', comissao_id).execute()
+                    
+                    # Adicionar observação ao objeto comissão para o e-mail
+                    if observacao_comissao:
+                        comissao['observacoes_direcao'] = observacao_comissao
                     
                     # Registrar no histórico (opcional)
                     try:
@@ -210,7 +232,7 @@ class AprovacaoComissoes:
                             'status_novo': self.STATUS_APROVADA,
                             'acao': 'Aprovado pela direção',
                             'realizado_por': usuario_id,
-                            'observacoes': observacoes
+                            'observacoes': observacao_comissao
                         }).execute()
                     except Exception as e:
                         print(f"Histórico não registrado: {str(e)}")
@@ -240,12 +262,15 @@ class AprovacaoComissoes:
                 'mensagem': f'Erro: {str(e)}'
             }
     
-    def rejeitar_comissoes(self, comissoes_ids: List[int], usuario_id: int, motivo: str) -> Dict:
+    def rejeitar_comissoes(self, comissoes_ids: List[int], usuario_id: int, motivo: str, observacoes: Optional[Dict] = None) -> Dict:
         """
         Rejeita comissões (ação da direção)
+        observacoes: Dict com {comissao_id: texto_observacao}
         """
         try:
             count = 0
+            observacoes = observacoes or {}
+            
             for comissao_id in comissoes_ids:
                 # Buscar status atual
                 response = self.supabase.table('sienge_comissoes')\
@@ -258,12 +283,21 @@ class AprovacaoComissoes:
                 if response.data:
                     status_anterior = response.data[0].get('status_aprovacao', self.STATUS_PENDENTE_APROVACAO)
                 
+                # Pegar observação específica desta comissão
+                observacao_comissao = observacoes.get(str(comissao_id), observacoes.get(comissao_id))
+                
+                # Combinar motivo da rejeição com observações (se houver)
+                texto_completo = motivo
+                if observacao_comissao:
+                    texto_completo = f"{motivo}\n\nObservações da Direção: {observacao_comissao}"
+                
                 # Atualizar status
                 self.supabase.table('sienge_comissoes').update({
                     'status_aprovacao': self.STATUS_REJEITADA,
                     'data_aprovacao': datetime.now().isoformat(),
                     'aprovado_por': usuario_id,
-                    'observacoes': motivo
+                    'observacoes': texto_completo,
+                    'observacoes_direcao': observacao_comissao
                 }).eq('id', comissao_id).execute()
                 
                 # Registrar no histórico (opcional)
@@ -274,7 +308,7 @@ class AprovacaoComissoes:
                         'status_novo': self.STATUS_REJEITADA,
                         'acao': 'Rejeitado pela direção',
                         'realizado_por': usuario_id,
-                        'observacoes': motivo
+                        'observacoes': texto_completo
                     }).execute()
                 except Exception as e:
                     print(f"Histórico não registrado: {str(e)}")
@@ -373,6 +407,17 @@ class AprovacaoComissoes:
         """Cria HTML do e-mail para direção"""
         linhas_tabela = ""
         for comissao in comissoes:
+            observacao = comissao.get('observacoes_corretor', '')
+            observacao_html = ""
+            if observacao:
+                observacao_html = f"""
+                <tr>
+                    <td colspan="5" style="padding: 8px 10px; background: #e3f2fd; border-bottom: 1px solid #eee; font-size: 0.9em;">
+                        <strong>💬 Observação do Corretor/Gestor:</strong> {observacao}
+                    </td>
+                </tr>
+                """
+            
             linhas_tabela += f"""
             <tr>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('broker_nome', 'N/A')}</td>
@@ -381,6 +426,7 @@ class AprovacaoComissoes:
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">R$ {float(comissao.get('valor_comissao') or comissao.get('commission_value') or 0):,.2f}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('installment_status', 'N/A')}</td>
             </tr>
+            {observacao_html}
             """
         
         html = f"""
@@ -432,6 +478,17 @@ class AprovacaoComissoes:
         """Cria HTML do e-mail para financeiro"""
         linhas_tabela = ""
         for comissao in comissoes:
+            observacao = comissao.get('observacoes_direcao', '')
+            observacao_html = ""
+            if observacao:
+                observacao_html = f"""
+                <tr>
+                    <td colspan="4" style="padding: 8px 10px; background: #fff9e6; border-bottom: 1px solid #eee; font-size: 0.9em;">
+                        <strong>💬 Observação da Direção:</strong> {observacao}
+                    </td>
+                </tr>
+                """
+            
             linhas_tabela += f"""
             <tr>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('broker_nome', 'N/A')}</td>
@@ -439,6 +496,7 @@ class AprovacaoComissoes:
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('unit_name', 'N/A')}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">R$ {float(comissao.get('valor_comissao') or comissao.get('commission_value') or 0):,.2f}</td>
             </tr>
+            {observacao_html}
             """
         
         html = f"""

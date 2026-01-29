@@ -958,6 +958,7 @@ def enviar_comissoes_aprovacao():
         
         data = request.get_json()
         comissoes_ids = data.get('comissoes_ids', [])
+        observacoes = data.get('observacoes')
         
         if not comissoes_ids:
             return jsonify({'erro': 'Nenhuma comissão selecionada'}), 400
@@ -965,7 +966,7 @@ def enviar_comissoes_aprovacao():
         sync = SiengeSupabaseSync()
         aprovacao = AprovacaoComissoes(sync.supabase)
         
-        resultado = aprovacao.enviar_para_aprovacao(comissoes_ids, current_user.id)
+        resultado = aprovacao.enviar_para_aprovacao(comissoes_ids, current_user.id, observacoes)
         
         if resultado['sucesso']:
             return jsonify(resultado), 200
@@ -1012,6 +1013,7 @@ def rejeitar_comissoes():
         data = request.get_json()
         comissoes_ids = data.get('comissoes_ids', [])
         motivo = data.get('motivo', '')
+        observacoes = data.get('observacoes')
         
         if not comissoes_ids:
             return jsonify({'erro': 'Nenhuma comissão selecionada'}), 400
@@ -1022,7 +1024,7 @@ def rejeitar_comissoes():
         sync = SiengeSupabaseSync()
         aprovacao = AprovacaoComissoes(sync.supabase)
         
-        resultado = aprovacao.rejeitar_comissoes(comissoes_ids, current_user.id, motivo)
+        resultado = aprovacao.rejeitar_comissoes(comissoes_ids, current_user.id, motivo, observacoes)
         
         if resultado['sucesso']:
             return jsonify(resultado), 200

@@ -348,6 +348,7 @@
                                     <th style="padding: 1rem;">Valor Gatilho</th>
                                     <th style="padding: 1rem;">Atingiu?</th>
                                     <th style="padding: 1rem;">Status Aprovação</th>
+                                    <th style="padding: 1rem; width: 80px;">Observações</th>
                                 </tr>
                             </thead>
                             <tbody id="corpoTabelaComissoes">
@@ -813,6 +814,188 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal de Observações para Direção -->
+    <div id="modalObservacaoComissao" class="modal-overlay-obs">
+        <div class="modal-content-obs">
+            <div class="modal-header-obs">
+                <h3 class="modal-title-obs">💬 Observações para a Direção</h3>
+                <button class="modal-close-obs" onclick="fecharModalObservacaoComissao()">×</button>
+            </div>
+            <div class="modal-body-obs">
+                <div class="modal-info-obs" id="infoComissaoModalObs"></div>
+                <textarea 
+                    id="textareaObservacaoComissao" 
+                    class="observacao-textarea-obs" 
+                    placeholder="Digite observações que serão enviadas à direção quando você enviar esta comissão para aprovação..."></textarea>
+            </div>
+            <div class="modal-footer-obs">
+                <button class="btn-modal-obs btn-modal-cancel-obs" onclick="fecharModalObservacaoComissao()">Cancelar</button>
+                <button class="btn-modal-obs btn-modal-save-obs" onclick="salvarObservacaoComissao()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Estilos do botão de observações */
+        .btn-observacao {
+            background: rgba(254, 80, 9, 0.1);
+            border: 1px solid rgba(254, 80, 9, 0.3);
+            color: #FE5009;
+            padding: 0.4rem 0.6rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-observacao:hover {
+            background: rgba(254, 80, 9, 0.2);
+            border-color: #FE5009;
+            transform: scale(1.05);
+        }
+
+        .btn-observacao.tem-observacao {
+            background: rgba(254, 80, 9, 0.3);
+            border-color: #FE5009;
+        }
+
+        /* Modal de observações */
+        .modal-overlay-obs {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+        }
+
+        .modal-overlay-obs.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content-obs {
+            background: linear-gradient(145deg, rgba(30, 30, 30, 0.98) 0%, rgba(20, 20, 20, 0.99) 100%);
+            border: 1px solid rgba(254, 80, 9, 0.3);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            animation: slideUpObs 0.3s ease;
+        }
+
+        .modal-header-obs {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title-obs {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .modal-close-obs {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .modal-close-obs:hover {
+            color: #FE5009;
+        }
+
+        .modal-body-obs {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-info-obs {
+            background: rgba(254, 80, 9, 0.1);
+            border-left: 3px solid #FE5009;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .observacao-textarea-obs {
+            width: 100%;
+            min-height: 120px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1rem;
+            color: #fff;
+            font-size: 0.95rem;
+            resize: vertical;
+            transition: all 0.2s;
+        }
+
+        .observacao-textarea-obs:focus {
+            outline: none;
+            border-color: #FE5009;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .modal-footer-obs {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn-modal-obs {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-modal-cancel-obs {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-modal-cancel-obs:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-modal-save-obs {
+            background: linear-gradient(135deg, #FE5009, #ff7b3d);
+            color: white;
+        }
+
+        .btn-modal-save-obs:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(254, 80, 9, 0.4);
+        }
+
+        @keyframes slideUpObs {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 
     <script src="/static/js/app.js"></script>
 </body>
