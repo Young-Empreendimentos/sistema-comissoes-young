@@ -1008,14 +1008,23 @@ def listar_todas_comissoes():
         # Ordenar por data
         comissoes.sort(key=lambda x: x.get('commission_date') or '', reverse=True)
         
-        # Adicionar valor_pago de cada comissão (buscar da tabela sienge_valor_pago)
-        for c in comissoes:
-            numero_contrato = c.get('numero_contrato')
-            building_id = c.get('building_id')
-            if numero_contrato and building_id:
-                valor_pago = sync.get_valor_pago_por_contrato(numero_contrato, building_id)
-                c['valor_pago'] = valor_pago or 0
-            else:
+        # Buscar todos os valores pagos de uma vez só (otimizado)
+        try:
+            valores_pagos_result = sync.supabase.table('sienge_valor_pago').select('numero_contrato, building_id, valor_pago').execute()
+            # Criar dicionário para lookup rápido: chave = "numero_contrato|building_id"
+            valores_pagos_map = {}
+            if valores_pagos_result.data:
+                for vp in valores_pagos_result.data:
+                    chave = f"{vp.get('numero_contrato')}|{vp.get('building_id')}"
+                    valores_pagos_map[chave] = vp.get('valor_pago', 0)
+            
+            # Adicionar valor_pago a cada comissão usando o dicionário
+            for c in comissoes:
+                chave = f"{c.get('numero_contrato')}|{c.get('building_id')}"
+                c['valor_pago'] = valores_pagos_map.get(chave, 0)
+        except Exception as e:
+            print(f"Erro ao buscar valores pagos: {e}")
+            for c in comissoes:
                 c['valor_pago'] = 0
         
         return jsonify({
