@@ -470,6 +470,56 @@ def listar_corretores_usuarios():
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 
+@app.route('/api/corretor/buscar-por-documento', methods=['GET'])
+def buscar_corretor_por_documento():
+    """Busca corretor pelo CPF ou CNPJ na tabela sienge_corretores"""
+    try:
+        documento = request.args.get('documento', '').strip()
+        
+        if not documento:
+            return jsonify({'sucesso': False, 'erro': 'Documento não informado'}), 400
+        
+        # Limpar documento (remover pontos, traços, barras)
+        documento_limpo = documento.replace('.', '').replace('-', '').replace('/', '').strip()
+        
+        if len(documento_limpo) < 11:
+            return jsonify({'sucesso': False, 'erro': 'Documento incompleto'}), 400
+        
+        sync = SiengeSupabaseSync()
+        
+        # Buscar na tabela sienge_corretores pelo CPF ou CNPJ
+        # Tentar buscar por CPF
+        result = sync.supabase.table('sienge_corretores')\
+            .select('sienge_id, cpf, cnpj, nome, email, telefone')\
+            .or_(f'cpf.eq.{documento_limpo},cnpj.eq.{documento_limpo}')\
+            .execute()
+        
+        if result.data and len(result.data) > 0:
+            corretor = result.data[0]
+            return jsonify({
+                'sucesso': True,
+                'encontrado': True,
+                'corretor': {
+                    'sienge_id': corretor.get('sienge_id'),
+                    'cpf': corretor.get('cpf'),
+                    'cnpj': corretor.get('cnpj'),
+                    'nome': corretor.get('nome'),
+                    'email': corretor.get('email'),
+                    'telefone': corretor.get('telefone')
+                }
+            }), 200
+        
+        return jsonify({
+            'sucesso': True,
+            'encontrado': False,
+            'mensagem': 'Corretor não encontrado no sistema SIENGE. Verifique se o CPF/CNPJ está correto.'
+        }), 200
+        
+    except Exception as e:
+        print(f"[API] Erro ao buscar corretor por documento: {str(e)}")
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
 @app.route('/api/contratos-por-corretor', methods=['GET'])
 @login_required
 def contratos_por_corretor():
@@ -1350,11 +1400,21 @@ def atualizar_configuracoes_emails(tipo):
 def cadastro_corretor():
     if request.method == 'POST':
         data = request.form
+        
+        # Obter sienge_id do formulário
+        sienge_id = data.get('sienge_id')
+        if sienge_id:
+            try:
+                sienge_id = int(sienge_id)
+            except:
+                sienge_id = None
+        
         resultado = auth_manager.criar_corretor(
             cpf=data.get('cpf'),
             senha=data.get('senha'),
             nome=data.get('nome'),
-            email=data.get('email')
+            email=data.get('email'),
+            sienge_id=sienge_id
         )
         
         if resultado['sucesso']:

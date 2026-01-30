@@ -159,51 +159,61 @@ class AuthManager:
             return None
     
     def autenticar_corretor(self, cpf: str, senha: str) -> Optional[CorretorUser]:
-        """Autentica um corretor"""
+        """Autentica um corretor usando a tabela sienge_corretores"""
         try:
-            # Limpar CPF (remover pontos e traços)
-            cpf_limpo = cpf.replace('.', '').replace('-', '').strip()
+            # Limpar documento (remover pontos, traços e barras)
+            doc_limpo = cpf.replace('.', '').replace('-', '').replace('/', '').strip()
             
-            resultado = self.supabase.table('corretores_usuarios')\
+            print(f"[AUTH] Tentando autenticar corretor com documento: {doc_limpo}")
+            
+            # Buscar na tabela sienge_corretores pelo CPF ou CNPJ
+            resultado = self.supabase.table('sienge_corretores')\
                 .select('*')\
-                .eq('cpf', cpf_limpo)\
+                .or_(f'cpf.eq.{doc_limpo},cnpj.eq.{doc_limpo}')\
                 .execute()
             
             if not resultado.data:
+                print(f"[AUTH] Corretor não encontrado com documento: {doc_limpo}")
                 return None
             
             corretor_data = resultado.data[0]
+            print(f"[AUTH] Corretor encontrado: {corretor_data.get('nome')}")
             
             # Ignorar se inativo
             if corretor_data.get('ativo') is False:
+                print(f"[AUTH] Corretor inativo")
                 return None
             
-            # Verificar senha (bcrypt, SHA256 ou texto plano)
-            hash_armazenado = corretor_data.get('password_hash') or corretor_data.get('senha_hash') or corretor_data.get('senha')
+            # Verificar se tem senha cadastrada
+            hash_armazenado = corretor_data.get('senha_hash') or corretor_data.get('password_hash')
             if not hash_armazenado:
+                print(f"[AUTH] Corretor não tem senha cadastrada")
                 return None
             
             if not self._verificar_senha(senha, hash_armazenado):
+                print(f"[AUTH] Senha incorreta")
                 return None
             
             # Atualizar último login
             try:
-                self.supabase.table('corretores_usuarios')\
+                self.supabase.table('sienge_corretores')\
                     .update({'ultimo_login': datetime.now().isoformat()})\
-                    .eq('id', corretor_data['id'])\
+                    .eq('sienge_id', corretor_data['sienge_id'])\
                     .execute()
             except Exception:
                 pass
             
             return CorretorUser(
-                id=corretor_data['id'],
-                cpf=corretor_data['cpf'],
+                id=corretor_data['sienge_id'],
+                cpf=corretor_data.get('cpf') or corretor_data.get('cnpj') or '',
                 nome=corretor_data.get('nome', ''),
                 email=corretor_data.get('email', ''),
                 sienge_id=corretor_data.get('sienge_id')
             )
         except Exception as e:
             print(f"Erro ao autenticar corretor: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def buscar_usuario_por_id(self, user_id: str) -> Optional[Usuario]:
@@ -212,18 +222,20 @@ class AuthManager:
             # Verificar se é corretor
             if str(user_id).startswith('corretor_'):
                 corretor_id = int(user_id.replace('corretor_', ''))
-                resultado = self.supabase.table('corretores_usuarios')\
+                resultado = self.supabase.table('sienge_corretores')\
                     .select('*')\
-                    .eq('id', corretor_id)\
-                    .eq('ativo', True)\
+                    .eq('sienge_id', corretor_id)\
                     .execute()
                 
                 if resultado.data:
                     corretor_data = resultado.data[0]
+                    # Verificar se está ativo (pode não ter o campo, então default True)
+                    if corretor_data.get('ativo') is False:
+                        return None
                     return CorretorUser(
-                        id=corretor_data['id'],
-                        cpf=corretor_data['cpf'],
-                        nome=corretor_data['nome'],
+                        id=corretor_data['sienge_id'],
+                        cpf=corretor_data.get('cpf') or corretor_data.get('cnpj') or '',
+                        nome=corretor_data.get('nome', ''),
                         email=corretor_data.get('email', ''),
                         sienge_id=corretor_data.get('sienge_id')
                     )
@@ -280,34 +292,56 @@ class AuthManager:
             return {'sucesso': False, 'erro': str(e)}
     
     def criar_corretor(self, cpf: str, senha: str, nome: str, email: str = None, sienge_id: int = None) -> dict:
-        """Cria um novo usuário corretor"""
+        """Cadastra senha para um corretor existente na tabela sienge_corretores"""
         try:
-            cpf_limpo = cpf.replace('.', '').replace('-', '').strip()
+            doc_limpo = cpf.replace('.', '').replace('-', '').replace('/', '').strip()
             
-            # Verificar se CPF já existe
-            existente = self.supabase.table('corretores_usuarios')\
-                .select('id')\
-                .eq('cpf', cpf_limpo)\
+            print(f"[AUTH] Criando acesso para corretor: {nome}, documento: {doc_limpo}, sienge_id: {sienge_id}")
+            
+            # Verificar se o corretor existe na tabela sienge_corretores
+            if sienge_id:
+                existente = self.supabase.table('sienge_corretores')\
+                    .select('*')\
+                    .eq('sienge_id', sienge_id)\
+                    .execute()
+            else:
+                existente = self.supabase.table('sienge_corretores')\
+                    .select('*')\
+                    .or_(f'cpf.eq.{doc_limpo},cnpj.eq.{doc_limpo}')\
+                    .execute()
+            
+            if not existente.data:
+                return {'sucesso': False, 'erro': 'Corretor não encontrado no sistema SIENGE. Verifique o CPF/CNPJ.'}
+            
+            corretor = existente.data[0]
+            
+            # Verificar se já tem senha cadastrada
+            if corretor.get('senha_hash') or corretor.get('password_hash'):
+                return {'sucesso': False, 'erro': 'Este corretor já possui cadastro. Use a opção de login.'}
+            
+            # Atualizar o registro com a senha e email
+            atualizacao = {
+                'senha_hash': self._hash_senha(senha),
+                'cadastro_login_em': datetime.now().isoformat()
+            }
+            
+            # Atualizar email se fornecido e não existir
+            if email and not corretor.get('email'):
+                atualizacao['email'] = email
+            
+            resultado = self.supabase.table('sienge_corretores')\
+                .update(atualizacao)\
+                .eq('sienge_id', corretor['sienge_id'])\
                 .execute()
             
-            if existente.data:
-                return {'sucesso': False, 'erro': 'CPF já cadastrado'}
-            
-            # Criar corretor
-            resultado = self.supabase.table('corretores_usuarios').insert({
-                'cpf': cpf_limpo,
-                'senha_hash': self._hash_senha(senha),
-                'nome': nome,
-                'email': email,
-                'sienge_id': sienge_id,
-                'ativo': True,
-                'criado_em': datetime.now().isoformat()
-            }).execute()
-            
             if resultado.data:
-                return {'sucesso': True, 'corretor_id': resultado.data[0]['id']}
-            return {'sucesso': False, 'erro': 'Erro ao criar corretor'}
+                print(f"[AUTH] Acesso criado com sucesso para corretor: {corretor['nome']}")
+                return {'sucesso': True, 'corretor_id': corretor['sienge_id']}
+            return {'sucesso': False, 'erro': 'Erro ao criar acesso do corretor'}
         except Exception as e:
+            print(f"[AUTH] Erro ao criar corretor: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {'sucesso': False, 'erro': str(e)}
     
     def listar_usuarios(self) -> list:
@@ -324,12 +358,12 @@ class AuthManager:
             return []
     
     def listar_corretores_usuarios(self) -> list:
-        """Lista todos os corretores cadastrados no sistema"""
+        """Lista todos os corretores que têm acesso ao sistema (com senha cadastrada)"""
         try:
-            # Usar tabela sienge_corretores que vem da sincronizacao
+            # Buscar corretores que têm senha_hash (ou seja, cadastraram acesso)
             resultado = self.supabase.table('sienge_corretores')\
-                .select('sienge_id, cpf, nome, email, telefone, ativo, atualizado_em')\
-                .eq('ativo', True)\
+                .select('sienge_id, cpf, cnpj, nome, email, telefone, ativo, ultimo_login, cadastro_login_em')\
+                .not_.is_('senha_hash', 'null')\
                 .order('nome')\
                 .execute()
             
@@ -337,11 +371,12 @@ class AuthManager:
             # Mapear campos para compatibilidade
             return [{
                 'id': c.get('sienge_id'),
-                'cpf': c.get('cpf') or '-',
+                'cpf': c.get('cpf') or c.get('cnpj') or '-',
                 'nome': c.get('nome'),
                 'email': c.get('email'),
                 'sienge_id': c.get('sienge_id'),
-                'ultimo_login': None
+                'ultimo_login': c.get('ultimo_login'),
+                'cadastro_em': c.get('cadastro_login_em')
             } for c in corretores]
         except Exception as e:
             print(f"Erro ao listar corretores: {str(e)}")
@@ -350,13 +385,18 @@ class AuthManager:
     def atualizar_senha(self, user_id: int, nova_senha: str, is_corretor: bool = False) -> dict:
         """Atualiza a senha de um usuário"""
         try:
-            tabela = 'corretores_usuarios' if is_corretor else 'usuarios'
-            coluna_senha = 'senha_hash' if is_corretor else 'password_hash'
-            
-            self.supabase.table(tabela)\
-                .update({coluna_senha: self._hash_senha(nova_senha)})\
-                .eq('id', user_id)\
-                .execute()
+            if is_corretor:
+                # Para corretor, usar sienge_corretores com sienge_id
+                self.supabase.table('sienge_corretores')\
+                    .update({'senha_hash': self._hash_senha(nova_senha)})\
+                    .eq('sienge_id', user_id)\
+                    .execute()
+            else:
+                # Para gestor, usar usuarios com id
+                self.supabase.table('usuarios')\
+                    .update({'password_hash': self._hash_senha(nova_senha)})\
+                    .eq('id', user_id)\
+                    .execute()
             
             return {'sucesso': True}
         except Exception as e:
@@ -365,12 +405,17 @@ class AuthManager:
     def desativar_usuario(self, user_id: int, is_corretor: bool = False) -> dict:
         """Desativa um usuário"""
         try:
-            tabela = 'corretores_usuarios' if is_corretor else 'usuarios'
-            
-            self.supabase.table(tabela)\
-                .update({'ativo': False})\
-                .eq('id', user_id)\
-                .execute()
+            if is_corretor:
+                # Para corretor, remover a senha (não desativa o corretor no SIENGE)
+                self.supabase.table('sienge_corretores')\
+                    .update({'senha_hash': None})\
+                    .eq('sienge_id', user_id)\
+                    .execute()
+            else:
+                self.supabase.table('usuarios')\
+                    .update({'ativo': False})\
+                    .eq('id', user_id)\
+                    .execute()
             
             return {'sucesso': True}
         except Exception as e:
