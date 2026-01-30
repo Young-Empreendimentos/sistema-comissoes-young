@@ -848,6 +848,94 @@
             border: 1px solid rgba(59, 130, 246, 0.5);
         }
 
+        /* Estilos do Multi-Select Direção */
+        .multi-select-container-dir {
+            position: relative;
+        }
+
+        .multi-select-trigger-dir {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+        }
+
+        .multi-select-trigger-dir:hover {
+            border-color: #FE5009;
+        }
+
+        .multi-select-text-dir {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+
+        .multi-select-arrow-dir {
+            font-size: 0.7rem;
+            color: #888;
+            margin-left: 0.5rem;
+            transition: transform 0.2s;
+        }
+
+        .multi-select-container-dir.open .multi-select-arrow-dir {
+            transform: rotate(180deg);
+        }
+
+        .multi-select-dropdown-dir {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            z-index: 100;
+            max-height: 250px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .multi-select-container-dir.open .multi-select-dropdown-dir {
+            display: block;
+        }
+
+        .multi-select-container-dir.open .multi-select-trigger-dir {
+            border-radius: 8px 8px 0 0;
+            border-color: #FE5009;
+        }
+
+        .multi-select-option-dir {
+            display: flex;
+            align-items: center;
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .multi-select-option-dir:hover {
+            background: rgba(254, 80, 9, 0.1);
+        }
+
+        .multi-select-option-dir input[type="checkbox"] {
+            margin-right: 0.75rem;
+            width: 16px;
+            height: 16px;
+            accent-color: #FE5009;
+            cursor: pointer;
+        }
+
         /* Responsividade */
         @media (max-width: 768px) {
             .dashboard-container {
@@ -1009,32 +1097,78 @@
             <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
                 <h3 style="color: #fff; font-size: 1rem; margin-bottom: 1rem; font-weight: 600;">Filtros</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <!-- Empreendimento (Multi-select) -->
                     <div>
                         <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Empreendimento</label>
-                        <select id="filtroEmpreendimentoDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
-                            <option value="">Todos</option>
-                        </select>
+                        <div class="multi-select-container-dir" id="containerEmpreendimentoDir">
+                            <div class="multi-select-trigger-dir" onclick="toggleMultiSelectDir('empreendimentoDir')">
+                                <span class="multi-select-text-dir" id="textEmpreendimentoDir">Todos</span>
+                                <span class="multi-select-arrow-dir">▼</span>
+                            </div>
+                            <div class="multi-select-dropdown-dir" id="dropdownEmpreendimentoDir">
+                                <!-- Preenchido via JavaScript -->
+                            </div>
+                        </div>
                     </div>
+                    
+                    <!-- Corretor (Multi-select) -->
                     <div>
                         <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Corretor</label>
-                        <select id="filtroCorretorDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
-                            <option value="">Todos</option>
-                        </select>
+                        <div class="multi-select-container-dir" id="containerCorretorDir">
+                            <div class="multi-select-trigger-dir" onclick="toggleMultiSelectDir('corretorDir')">
+                                <span class="multi-select-text-dir" id="textCorretorDir">Todos</span>
+                                <span class="multi-select-arrow-dir">▼</span>
+                            </div>
+                            <div class="multi-select-dropdown-dir" id="dropdownCorretorDir">
+                                <!-- Preenchido via JavaScript -->
+                            </div>
+                        </div>
                     </div>
+                    
+                    <!-- Regra de Comissão (Multi-select) -->
                     <div>
                         <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Regra de Comissão</label>
-                        <select id="filtroRegraDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
-                            <option value="">Todas</option>
-                        </select>
+                        <div class="multi-select-container-dir" id="containerRegraDir">
+                            <div class="multi-select-trigger-dir" onclick="toggleMultiSelectDir('regraDir')">
+                                <span class="multi-select-text-dir" id="textRegraDir">Todas</span>
+                                <span class="multi-select-arrow-dir">▼</span>
+                            </div>
+                            <div class="multi-select-dropdown-dir" id="dropdownRegraDir">
+                                <!-- Preenchido via JavaScript -->
+                            </div>
+                        </div>
                     </div>
+                    
+                    <!-- Auditoria (Multi-select) -->
                     <div>
                         <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Auditoria</label>
-                        <select id="filtroAuditoriaDir" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
-                            <option value="">Todas</option>
-                            <option value="sim">Aprovada</option>
-                            <option value="nao">Não Aprovada</option>
-                            <option value="pendente">Pendente</option>
-                        </select>
+                        <div class="multi-select-container-dir" id="containerAuditoriaDir">
+                            <div class="multi-select-trigger-dir" onclick="toggleMultiSelectDir('auditoriaDir')">
+                                <span class="multi-select-text-dir" id="textAuditoriaDir">Todas</span>
+                                <span class="multi-select-arrow-dir">▼</span>
+                            </div>
+                            <div class="multi-select-dropdown-dir" id="dropdownAuditoriaDir">
+                                <label class="multi-select-option-dir">
+                                    <input type="checkbox" value="sim" onchange="updateMultiSelectTextDir('auditoriaDir')"> Aprovada
+                                </label>
+                                <label class="multi-select-option-dir">
+                                    <input type="checkbox" value="nao" onchange="updateMultiSelectTextDir('auditoriaDir')"> Não Aprovada
+                                </label>
+                                <label class="multi-select-option-dir">
+                                    <input type="checkbox" value="pendente" onchange="updateMultiSelectTextDir('auditoriaDir')"> Pendente
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Período do Contrato -->
+                    <div style="grid-column: span 2;">
+                        <label style="display: block; color: #888; font-size: 0.85rem; margin-bottom: 0.5rem;">Período do Contrato</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="date" id="filtroDataInicioDir" style="flex: 1; padding: 0.65rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
+                            <span style="color: #888;">até</span>
+                            <input type="date" id="filtroDataFimDir" style="flex: 1; padding: 0.65rem; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 0.9rem;">
+                        </div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 1rem; margin-top: 1rem;">

@@ -285,38 +285,98 @@
                     <p class="card-subtitle">Visualize e gerencie todas as comissões do sistema</p>
 
                     <!-- Filtros -->
-                    <div class="filtros-comissoes" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
-                        <div class="form-group" style="flex: 1; min-width: 200px;">
-                            <label class="form-label">Status Parcela</label>
-                            <select id="filtroStatusParcela" class="form-select">
-                                <option value="">Todos</option>
-                                <option value="Pago">Pago</option>
-                                <option value="Pendente">Pendente</option>
-                                <option value="Vencido">Vencido</option>
-                                <option value="Aberto">Aberto</option>
-                                <option value="Parcial">Parcial</option>
-                            </select>
+                    <div class="filtros-comissoes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: #1a1a1a; border-radius: 12px; border: 1px solid #333;">
+                        <!-- Filtro Status SIENGE (Multi-select) -->
+                        <div class="form-group">
+                            <label class="form-label">Status SIENGE</label>
+                            <div class="multi-select-container" id="containerStatusParcela">
+                                <div class="multi-select-trigger" onclick="toggleMultiSelect('statusParcela')">
+                                    <span class="multi-select-text" id="textStatusParcela">Todos</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="dropdownStatusParcela">
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Pago" onchange="updateMultiSelectText('statusParcela')"> Pago
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Pendente" onchange="updateMultiSelectText('statusParcela')"> Pendente
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Vencido" onchange="updateMultiSelectText('statusParcela')"> Vencido
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Aberto" onchange="updateMultiSelectText('statusParcela')"> Aberto
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Parcial" onchange="updateMultiSelectText('statusParcela')"> Parcial
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Aguardando Autorização" onchange="updateMultiSelectText('statusParcela')"> Aguardando Autorização
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Liberado" onchange="updateMultiSelectText('statusParcela')"> Liberado
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group" style="flex: 1; min-width: 200px;">
+
+                        <!-- Filtro Gatilho (Multi-select) -->
+                        <div class="form-group">
                             <label class="form-label">Gatilho Atingido</label>
-                            <select id="filtroGatilho" class="form-select">
-                                <option value="">Todos</option>
-                                <option value="true">Sim</option>
-                                <option value="false">Não</option>
-                            </select>
+                            <div class="multi-select-container" id="containerGatilho">
+                                <div class="multi-select-trigger" onclick="toggleMultiSelect('gatilho')">
+                                    <span class="multi-select-text" id="textGatilho">Todos</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="dropdownGatilho">
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="true" onchange="updateMultiSelectText('gatilho')"> Sim
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="false" onchange="updateMultiSelectText('gatilho')"> Não
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group" style="flex: 1; min-width: 200px;">
+
+                        <!-- Filtro Status Aprovação (Multi-select) -->
+                        <div class="form-group">
                             <label class="form-label">Status Aprovação</label>
-                            <select id="filtroStatusAprovacao" class="form-select">
-                                <option value="">Todos</option>
-                                <option value="Pendente">Pendente</option>
-                                <option value="Pendente de Aprovação">Pendente de Aprovação</option>
-                                <option value="Aprovada">Aprovada</option>
-                                <option value="Rejeitada">Rejeitada</option>
-                            </select>
+                            <div class="multi-select-container" id="containerStatusAprovacao">
+                                <div class="multi-select-trigger" onclick="toggleMultiSelect('statusAprovacao')">
+                                    <span class="multi-select-text" id="textStatusAprovacao">Todos</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="dropdownStatusAprovacao">
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Pendente" onchange="updateMultiSelectText('statusAprovacao')"> Aguardando liberação
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Pendente de Aprovação" onchange="updateMultiSelectText('statusAprovacao')"> Em análise da direção
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Aprovada" onchange="updateMultiSelectText('statusAprovacao')"> Aprovada
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="Rejeitada" onchange="updateMultiSelectText('statusAprovacao')"> Rejeitada
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
-                            <button class="btn-primary" onclick="buscarComissoes()">Buscar</button>
+
+                        <!-- Filtro Período Data Contrato -->
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label class="form-label">Período do Contrato</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="date" id="filtroDataInicio" class="form-input" style="flex: 1; padding: 0.65rem; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: #fff;">
+                                <span style="color: #888;">até</span>
+                                <input type="date" id="filtroDataFim" class="form-input" style="flex: 1; padding: 0.65rem; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: #fff;">
+                            </div>
+                        </div>
+
+                        <!-- Botões -->
+                        <div style="display: flex; align-items: flex-end; gap: 0.5rem; grid-column: span 1;">
+                            <button class="btn-primary" onclick="buscarComissoes()" style="flex: 1;">Buscar</button>
                             <button class="btn-secondary" onclick="limparFiltrosComissoes()">Limpar</button>
                         </div>
                     </div>
@@ -339,10 +399,11 @@
                             <thead>
                                 <tr style="background: linear-gradient(135deg, #FE5009, #c73d00); color: white;">
                                     <th style="padding: 1rem;"><input type="checkbox" id="selecionarTodas" onchange="toggleTodasComissoes()"></th>
-                                    <th style="padding: 1rem;">Status Parcela</th>
+                                    <th style="padding: 1rem;">Status SIENGE</th>
                                     <th style="padding: 1rem;">Corretor</th>
                                     <th style="padding: 1rem;">Empreendimento</th>
                                     <th style="padding: 1rem;">Lote</th>
+                                    <th style="padding: 1rem;">Data Contrato</th>
                                     <th style="padding: 1rem;">Cliente</th>
                                     <th style="padding: 1rem;">Valor Comissão</th>
                                     <th style="padding: 1rem;">Valor Pago</th>
@@ -353,7 +414,7 @@
                                 </tr>
                             </thead>
                             <tbody id="corpoTabelaComissoes">
-                                <tr><td colspan="12" style="text-align: center; padding: 2rem;">Clique em "Buscar" para carregar as comissões</td></tr>
+                                <tr><td colspan="13" style="text-align: center; padding: 2rem;">Clique em "Buscar" para carregar as comissões</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -378,34 +439,82 @@
                     </div>
 
                     <!-- Filtros do Relatório -->
-                    <div class="filtros-relatorio" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+                    <div class="filtros-relatorio" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+                        <!-- Empreendimento (Multi-select) -->
                         <div class="form-group">
                             <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Empreendimento</label>
-                            <select id="filtroRelatorioEmpreendimento" class="form-select">
-                                <option value="">Todos</option>
-                            </select>
+                            <div class="multi-select-container" id="containerRelatorioEmpreendimento">
+                                <div class="multi-select-trigger" onclick="toggleMultiSelect('relatorioEmpreendimento')">
+                                    <span class="multi-select-text" id="textRelatorioEmpreendimento">Todos</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="dropdownRelatorioEmpreendimento">
+                                    <!-- Preenchido via JavaScript -->
+                                </div>
+                            </div>
                         </div>
+                        
+                        <!-- Corretor (Multi-select) -->
                         <div class="form-group">
                             <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Corretor</label>
-                            <select id="filtroRelatorioCorretor" class="form-select">
-                                <option value="">Todos</option>
-                            </select>
+                            <div class="multi-select-container" id="containerRelatorioCorretor">
+                                <div class="multi-select-trigger" onclick="toggleMultiSelect('relatorioCorretor')">
+                                    <span class="multi-select-text" id="textRelatorioCorretor">Todos</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="dropdownRelatorioCorretor">
+                                    <!-- Preenchido via JavaScript -->
+                                </div>
+                            </div>
                         </div>
+                        
+                        <!-- Regra Aplicada (Multi-select) -->
                         <div class="form-group">
                             <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Regra Aplicada</label>
-                            <select id="filtroRelatorioRegra" class="form-select">
-                                <option value="">Todas</option>
-                            </select>
+                            <div class="multi-select-container" id="containerRelatorioRegra">
+                                <div class="multi-select-trigger" onclick="toggleMultiSelect('relatorioRegra')">
+                                    <span class="multi-select-text" id="textRelatorioRegra">Todas</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="dropdownRelatorioRegra">
+                                    <!-- Preenchido via JavaScript -->
+                                </div>
+                            </div>
                         </div>
+                        
+                        <!-- Auditoria (Multi-select) -->
                         <div class="form-group">
                             <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Auditoria</label>
-                            <select id="filtroRelatorioAuditoria" class="form-select">
-                                <option value="">Todos</option>
-                                <option value="sim">Aprovada</option>
-                                <option value="nao">Não Aprovada</option>
-                                <option value="pendente">Pendente</option>
-                            </select>
+                            <div class="multi-select-container" id="containerRelatorioAuditoria">
+                                <div class="multi-select-trigger" onclick="toggleMultiSelect('relatorioAuditoria')">
+                                    <span class="multi-select-text" id="textRelatorioAuditoria">Todas</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </div>
+                                <div class="multi-select-dropdown" id="dropdownRelatorioAuditoria">
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="sim" onchange="updateMultiSelectText('relatorioAuditoria')"> Aprovada
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="nao" onchange="updateMultiSelectText('relatorioAuditoria')"> Não Aprovada
+                                    </label>
+                                    <label class="multi-select-option">
+                                        <input type="checkbox" value="pendente" onchange="updateMultiSelectText('relatorioAuditoria')"> Pendente
+                                    </label>
+                                </div>
+                            </div>
                         </div>
+                        
+                        <!-- Período do Contrato -->
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label class="form-label" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 0.5rem; display: block;">Período do Contrato</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="date" id="filtroRelatorioDataInicio" class="form-input" style="flex: 1; padding: 0.65rem; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: #fff;">
+                                <span style="color: #888;">até</span>
+                                <input type="date" id="filtroRelatorioDataFim" class="form-input" style="flex: 1; padding: 0.65rem; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: #fff;">
+                            </div>
+                        </div>
+                        
+                        <!-- Botões -->
                         <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
                             <button class="btn-primary" onclick="carregarRelatorioComissoes()" style="flex: 1;">Buscar</button>
                             <button class="btn-secondary" onclick="limparFiltrosRelatorio()" style="padding: 0.75rem;">Limpar</button>
@@ -838,6 +947,100 @@
     </div>
 
     <style>
+        /* Estilos do Multi-Select */
+        .multi-select-container {
+            position: relative;
+        }
+
+        .multi-select-trigger {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+        }
+
+        .multi-select-trigger:hover {
+            border-color: #FE5009;
+        }
+
+        .multi-select-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+
+        .multi-select-arrow {
+            font-size: 0.7rem;
+            color: #888;
+            margin-left: 0.5rem;
+            transition: transform 0.2s;
+        }
+
+        .multi-select-container.open .multi-select-arrow {
+            transform: rotate(180deg);
+        }
+
+        .multi-select-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            z-index: 100;
+            max-height: 250px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .multi-select-container.open .multi-select-dropdown {
+            display: block;
+        }
+
+        .multi-select-container.open .multi-select-trigger {
+            border-radius: 8px 8px 0 0;
+            border-color: #FE5009;
+        }
+
+        .multi-select-option {
+            display: flex;
+            align-items: center;
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .multi-select-option:hover {
+            background: rgba(254, 80, 9, 0.1);
+        }
+
+        .multi-select-option input[type="checkbox"] {
+            margin-right: 0.75rem;
+            width: 16px;
+            height: 16px;
+            accent-color: #FE5009;
+            cursor: pointer;
+        }
+
+        .multi-select-option input[type="checkbox"]:checked + span,
+        .multi-select-option:has(input:checked) {
+            color: #FE5009;
+            font-weight: 500;
+        }
+
         /* Estilos do botão de observações */
         .btn-observacao {
             background: rgba(254, 80, 9, 0.1);

@@ -269,7 +269,8 @@
             const statusLower = (status || '').toLowerCase();
             if (statusLower.includes('aprovad')) return '<span class="status-badge status-aprovada">Aprovada</span>';
             if (statusLower.includes('pag')) return '<span class="status-badge status-paga">Paga</span>';
-            return '<span class="status-badge status-pendente">Pendente</span>';
+            if (statusLower.includes('pendente de aprovação')) return '<span class="status-badge status-pendente">Em análise da direção</span>';
+            return '<span class="status-badge status-pendente">Aguardando liberação</span>';
         }
 
         // Carregar contratos do corretor

@@ -452,33 +452,102 @@ function setupNavegacaoDirecao() {
     });
 }
 
+// ==================== FUNÇÕES DE MULTI-SELECT ====================
+
+function toggleMultiSelectDir(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirstDir(filtroId)}`);
+    if (!container) return;
+    
+    // Fechar outros dropdowns abertos
+    document.querySelectorAll('.multi-select-container-dir.open').forEach(c => {
+        if (c !== container) c.classList.remove('open');
+    });
+    
+    container.classList.toggle('open');
+}
+
+function capitalizeFirstDir(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function updateMultiSelectTextDir(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirstDir(filtroId)}`);
+    const textElement = document.getElementById(`text${capitalizeFirstDir(filtroId)}`);
+    if (!container || !textElement) return;
+    
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    
+    if (checkboxes.length === 0) {
+        textElement.textContent = filtroId.includes('auditoria') ? 'Todas' : 'Todos';
+    } else if (checkboxes.length === 1) {
+        const label = checkboxes[0].closest('label');
+        textElement.textContent = label ? label.textContent.trim() : checkboxes[0].value;
+    } else {
+        textElement.textContent = `${checkboxes.length} selecionados`;
+    }
+}
+
+function getMultiSelectValuesDir(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirstDir(filtroId)}`);
+    if (!container) return [];
+    
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+function clearMultiSelectDir(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirstDir(filtroId)}`);
+    if (!container) return;
+    
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+    updateMultiSelectTextDir(filtroId);
+}
+
+function populateMultiSelectDir(filtroId, options, valueField = 'id', textField = 'nome') {
+    const dropdown = document.getElementById(`dropdown${capitalizeFirstDir(filtroId)}`);
+    if (!dropdown || !options) return;
+    
+    dropdown.innerHTML = options.map(opt => `
+        <label class="multi-select-option-dir">
+            <input type="checkbox" value="${opt[valueField] || opt}" onchange="updateMultiSelectTextDir('${filtroId}')"> ${opt[textField] || opt}
+        </label>
+    `).join('');
+}
+
+// Fechar dropdowns ao clicar fora
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.multi-select-container-dir')) {
+        document.querySelectorAll('.multi-select-container-dir.open').forEach(c => {
+            c.classList.remove('open');
+        });
+    }
+});
+
+// ==================== FILTROS DO RELATÓRIO ====================
+
 async function carregarFiltrosRelatorioDir() {
     try {
         // Carregar empreendimentos
         const respEmp = await fetch('/api/empreendimentos');
         const empreendimentos = await respEmp.json();
-        const selectEmp = document.getElementById('filtroEmpreendimentoDir');
-        if (selectEmp && empreendimentos) {
-            selectEmp.innerHTML = '<option value="">Todos</option>' + 
-                empreendimentos.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+        if (empreendimentos && Array.isArray(empreendimentos)) {
+            populateMultiSelectDir('empreendimentoDir', empreendimentos, 'id', 'nome');
         }
         
         // Carregar corretores
         const respCorr = await fetch('/api/relatorio-comissoes/corretores');
         const corretores = await respCorr.json();
-        const selectCorr = document.getElementById('filtroCorretorDir');
-        if (selectCorr && corretores && Array.isArray(corretores)) {
-            selectCorr.innerHTML = '<option value="">Todos</option>' + 
-                corretores.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+        if (corretores && Array.isArray(corretores)) {
+            populateMultiSelectDir('corretorDir', corretores, 'id', 'nome');
         }
         
         // Carregar regras
         const respRegras = await fetch('/api/regras-gatilho');
         const regras = await respRegras.json();
-        const selectRegra = document.getElementById('filtroRegraDir');
-        if (selectRegra && regras) {
-            selectRegra.innerHTML = '<option value="">Todas</option>' + 
-                regras.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+        if (regras && Array.isArray(regras)) {
+            populateMultiSelectDir('regraDir', regras, 'id', 'nome');
         }
     } catch (error) {
         console.error('Erro ao carregar filtros:', error);
@@ -502,18 +571,25 @@ function buscarRelatorioDir() {
         </div>
     `;
     
+    // Obter valores dos multi-selects
+    const empreendimentos = getMultiSelectValuesDir('empreendimentoDir');
+    const corretores = getMultiSelectValuesDir('corretorDir');
+    const regras = getMultiSelectValuesDir('regraDir');
+    const auditorias = getMultiSelectValuesDir('auditoriaDir');
+    
+    // Obter filtros de data
+    const dataInicio = document.getElementById('filtroDataInicioDir')?.value || '';
+    const dataFim = document.getElementById('filtroDataFimDir')?.value || '';
+    
     // Montar URL com filtros
     let url = '/api/relatorio-comissoes?';
     
-    const empreendimento = document.getElementById('filtroEmpreendimentoDir')?.value;
-    const corretor = document.getElementById('filtroCorretorDir')?.value;
-    const regra = document.getElementById('filtroRegraDir')?.value;
-    const auditoria = document.getElementById('filtroAuditoriaDir')?.value;
-    
-    if (empreendimento) url += `empreendimento_id=${empreendimento}&`;
-    if (corretor) url += `corretor_id=${corretor}&`;
-    if (regra) url += `regra_id=${regra}&`;
-    if (auditoria) url += `auditoria=${auditoria}&`;
+    if (empreendimentos.length > 0) url += `empreendimento_id=${empreendimentos.join(',')}&`;
+    if (corretores.length > 0) url += `corretor_id=${corretores.join(',')}&`;
+    if (regras.length > 0) url += `regra_id=${regras.join(',')}&`;
+    if (auditorias.length > 0) url += `auditoria=${auditorias.join(',')}&`;
+    if (dataInicio) url += `data_inicio=${dataInicio}&`;
+    if (dataFim) url += `data_fim=${dataFim}&`;
     
     fetch(url)
         .then(response => response.json())
@@ -531,10 +607,18 @@ function buscarRelatorioDir() {
 }
 
 function limparFiltrosDir() {
-    document.getElementById('filtroEmpreendimentoDir').value = '';
-    document.getElementById('filtroCorretorDir').value = '';
-    document.getElementById('filtroRegraDir').value = '';
-    document.getElementById('filtroAuditoriaDir').value = '';
+    // Limpar multi-selects
+    clearMultiSelectDir('empreendimentoDir');
+    clearMultiSelectDir('corretorDir');
+    clearMultiSelectDir('regraDir');
+    clearMultiSelectDir('auditoriaDir');
+    
+    // Limpar campos de data
+    const dataInicio = document.getElementById('filtroDataInicioDir');
+    const dataFim = document.getElementById('filtroDataFimDir');
+    if (dataInicio) dataInicio.value = '';
+    if (dataFim) dataFim.value = '';
+    
     buscarRelatorioDir();
 }
 

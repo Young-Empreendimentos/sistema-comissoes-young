@@ -762,11 +762,21 @@ def relatorio_comissoes():
     try:
         sync = SiengeSupabaseSync()
         
-        # Parâmetros de filtro
-        empreendimento_id = request.args.get('empreendimento_id')
-        corretor_id = request.args.get('corretor_id')
-        regra_id = request.args.get('regra_id')
-        auditoria = request.args.get('auditoria')
+        # Parâmetros de filtro (agora suportam múltiplos valores separados por vírgula)
+        empreendimento_param = request.args.get('empreendimento_id', '')
+        corretor_param = request.args.get('corretor_id', '')
+        regra_param = request.args.get('regra_id', '')
+        auditoria_param = request.args.get('auditoria', '')
+        data_inicio = request.args.get('data_inicio', '')
+        data_fim = request.args.get('data_fim', '')
+        
+        # Converter para listas (split por vírgula)
+        empreendimento_list = [s.strip() for s in empreendimento_param.split(',') if s.strip()]
+        corretor_list = [s.strip() for s in corretor_param.split(',') if s.strip()]
+        regra_list = [s.strip() for s in regra_param.split(',') if s.strip()]
+        auditoria_list = [s.strip() for s in auditoria_param.split(',') if s.strip()]
+        
+        print(f"[API Relatório] Filtros - empreendimentos: {empreendimento_list}, corretores: {corretor_list}, regras: {regra_list}, auditorias: {auditoria_list}, data: {data_inicio} a {data_fim}")
         
         # Buscar todas as comissões
         query = sync.supabase.table('sienge_comissoes').select('*')
@@ -776,28 +786,63 @@ def relatorio_comissoes():
         comissoes = [c for c in (result.data or []) 
                      if 'cancel' not in (c.get('installment_status') or '').lower()]
         
-        # Aplicar filtros
-        if empreendimento_id:
-            comissoes = [c for c in comissoes if str(c.get('building_id')) == str(empreendimento_id)]
+        # Aplicar filtros (multi-select)
+        if empreendimento_list:
+            comissoes = [c for c in comissoes if str(c.get('building_id')) in empreendimento_list]
         
-        if corretor_id:
-            comissoes = [c for c in comissoes if str(c.get('broker_id')) == str(corretor_id)]
+        if corretor_list:
+            comissoes = [c for c in comissoes if str(c.get('broker_id')) in corretor_list]
         
-        if auditoria:
-            if auditoria == 'sim':
-                comissoes = [c for c in comissoes if c.get('auditoria_aprovada') == True]
-            elif auditoria == 'nao':
-                comissoes = [c for c in comissoes if c.get('auditoria_aprovada') == False]
-            elif auditoria == 'pendente':
-                comissoes = [c for c in comissoes if c.get('auditoria_aprovada') is None]
+        if auditoria_list:
+            def match_auditoria(comissao):
+                auditoria_valor = comissao.get('auditoria_aprovada')
+                for a in auditoria_list:
+                    if a == 'sim' and auditoria_valor == True:
+                        return True
+                    elif a == 'nao' and auditoria_valor == False:
+                        return True
+                    elif a == 'pendente' and auditoria_valor is None:
+                        return True
+                return False
+            comissoes = [c for c in comissoes if match_auditoria(c)]
+        
+        # Filtrar por regra (multi-select)
+        if regra_list:
+            comissoes = [c for c in comissoes if str(c.get('regra_gatilho_id')) in regra_list]
         
         # Buscar regras de gatilho para associar
         regras_result = sync.supabase.table('regras_gatilho').select('*').execute()
         regras_dict = {r['id']: r for r in (regras_result.data or [])}
         
-        # Buscar contratos para pegar dados do cliente e lote
+        # Buscar contratos para pegar dados do cliente, lote e data_contrato
         contratos_result = sync.supabase.table('sienge_contratos').select('*').execute()
         contratos_dict = {c['numero_contrato']: c for c in (contratos_result.data or [])}
+        
+        # Filtrar por período de data do contrato
+        if data_inicio or data_fim:
+            def filtrar_por_data_relatorio(comissao):
+                numero_contrato = comissao.get('numero_contrato')
+                contrato = contratos_dict.get(numero_contrato, {})
+                data_contrato = contrato.get('data_contrato')
+                if not data_contrato:
+                    return False
+                
+                try:
+                    if 'T' in str(data_contrato):
+                        data_str = str(data_contrato).split('T')[0]
+                    else:
+                        data_str = str(data_contrato)[:10]
+                    
+                    if data_inicio and data_str < data_inicio:
+                        return False
+                    if data_fim and data_str > data_fim:
+                        return False
+                    return True
+                except:
+                    return False
+            
+            comissoes = [c for c in comissoes if filtrar_por_data_relatorio(c)]
+            print(f"[API Relatório] Após filtro de data: {len(comissoes)} comissões")
         
         # Buscar empreendimentos (usando o método do sync)
         empreendimentos_lista = sync.get_empreendimentos()
@@ -847,10 +892,6 @@ def relatorio_comissoes():
             corretor_nome = comissao.get('broker_nome') or comissao.get('broker_name') or 'Não informado'
             corretores_unicos.add(corretor_nome)
             
-            # Filtrar por regra se especificado
-            if regra_id and str(regra_id_aplicada) != str(regra_id):
-                continue
-            
             relatorio.append({
                 'numero_contrato': numero_contrato,
                 'lote': contrato.get('numero_lote') or comissao.get('unit_name') or f"Contrato {numero_contrato}",
@@ -865,7 +906,8 @@ def relatorio_comissoes():
                 'tipo_regra': tipo_regra,
                 'auditoria_aprovada': auditoria_status,
                 'valor_comissao': valor_comissao,
-                'status_aprovacao': comissao.get('status_aprovacao', 'Pendente')
+                'status_aprovacao': comissao.get('status_aprovacao', 'Pendente'),
+                'data_contrato': contrato.get('data_contrato')
             })
         
         # Ordenar por empreendimento e lote
@@ -950,16 +992,22 @@ def listar_todas_comissoes():
     try:
         sync = SiengeSupabaseSync()
         
-        # Obter parâmetros de filtro
-        status_parcela = request.args.get('status_parcela')
-        status_aprovacao = request.args.get('status_aprovacao')
-        gatilho_atingido = request.args.get('gatilho_atingido')
+        # Obter parâmetros de filtro (agora suportam múltiplos valores separados por vírgula)
+        status_parcela_param = request.args.get('status_parcela', '')
+        status_aprovacao_param = request.args.get('status_aprovacao', '')
+        gatilho_atingido_param = request.args.get('gatilho_atingido', '')
+        data_inicio = request.args.get('data_inicio', '')
+        data_fim = request.args.get('data_fim', '')
+        
+        # Converter para listas (split por vírgula)
+        status_parcela_list = [s.strip() for s in status_parcela_param.split(',') if s.strip()]
+        status_aprovacao_list = [s.strip() for s in status_aprovacao_param.split(',') if s.strip()]
+        gatilho_list = [s.strip() for s in gatilho_atingido_param.split(',') if s.strip()]
+        
+        print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, data_inicio: {data_inicio}, data_fim: {data_fim}")
         
         # Buscar todas as comissões
         query = sync.supabase.table('sienge_comissoes').select('*')
-        
-        if status_aprovacao:
-            query = query.eq('status_aprovacao', status_aprovacao)
         
         result = query.execute()
         comissoes = result.data if result.data else []
@@ -990,20 +1038,31 @@ def listar_todas_comissoes():
             'vencido': ['overdue', 'vencido'],
             'aberto': ['open', 'aberto'],
             'parcial': ['partial', 'parcial'],
-            'cancelado': ['cancelled', 'canceled', 'cancelado']
+            'cancelado': ['cancelled', 'canceled', 'cancelado'],
+            'aguardando autorização': ['awaiting authorization', 'awaiting_authorization', 'aguardando autorização'],
+            'liberado': ['released', 'liberado']
         }
         
-        if status_parcela:
-            status_lower = status_parcela.lower()
-            # Verificar se é um status em PT-BR e mapear para inglês
-            valores_busca = mapa_status_parcela.get(status_lower, [status_lower])
-            comissoes = [c for c in comissoes if any(
-                v in (c.get('installment_status') or '').lower() for v in valores_busca
-            )]
+        # Filtro de status da parcela (multi-select)
+        if status_parcela_list:
+            def match_status_parcela(comissao):
+                status_comissao = (comissao.get('installment_status') or '').lower()
+                for status in status_parcela_list:
+                    status_lower = status.lower()
+                    valores_busca = mapa_status_parcela.get(status_lower, [status_lower])
+                    if any(v in status_comissao for v in valores_busca):
+                        return True
+                return False
+            comissoes = [c for c in comissoes if match_status_parcela(c)]
         
-        if gatilho_atingido is not None:
-            gatilho_bool = gatilho_atingido.lower() == 'true'
-            comissoes = [c for c in comissoes if c.get('atingiu_gatilho') == gatilho_bool]
+        # Filtro de status de aprovação (multi-select)
+        if status_aprovacao_list:
+            comissoes = [c for c in comissoes if c.get('status_aprovacao') in status_aprovacao_list]
+        
+        # Filtro de gatilho atingido (multi-select)
+        if gatilho_list:
+            gatilho_bools = [g.lower() == 'true' for g in gatilho_list]
+            comissoes = [c for c in comissoes if c.get('atingiu_gatilho') in gatilho_bools]
         
         # Ordenar por data
         comissoes.sort(key=lambda x: x.get('commission_date') or '', reverse=True)
@@ -1026,6 +1085,51 @@ def listar_todas_comissoes():
             print(f"Erro ao buscar valores pagos: {e}")
             for c in comissoes:
                 c['valor_pago'] = 0
+        
+        # Buscar data_contrato da tabela sienge_contratos
+        try:
+            contratos_result = sync.supabase.table('sienge_contratos').select('numero_contrato, building_id, data_contrato').execute()
+            # Criar dicionário para lookup rápido
+            data_contrato_map = {}
+            if contratos_result.data:
+                for ct in contratos_result.data:
+                    chave = f"{ct.get('numero_contrato')}|{ct.get('building_id')}"
+                    data_contrato_map[chave] = ct.get('data_contrato')
+            
+            # Adicionar data_contrato a cada comissão
+            for c in comissoes:
+                chave = f"{c.get('numero_contrato')}|{c.get('building_id')}"
+                c['data_contrato'] = data_contrato_map.get(chave)
+        except Exception as e:
+            print(f"Erro ao buscar data_contrato: {e}")
+            for c in comissoes:
+                c['data_contrato'] = None
+        
+        # Filtro de período de data do contrato
+        if data_inicio or data_fim:
+            def filtrar_por_data(comissao):
+                data_contrato = comissao.get('data_contrato')
+                if not data_contrato:
+                    return False
+                
+                # Converter para formato comparável (YYYY-MM-DD)
+                try:
+                    # data_contrato pode vir em diferentes formatos
+                    if 'T' in str(data_contrato):
+                        data_str = str(data_contrato).split('T')[0]
+                    else:
+                        data_str = str(data_contrato)[:10]
+                    
+                    if data_inicio and data_str < data_inicio:
+                        return False
+                    if data_fim and data_str > data_fim:
+                        return False
+                    return True
+                except:
+                    return False
+            
+            comissoes = [c for c in comissoes if filtrar_por_data(c)]
+            print(f"[API] Após filtro de data: {len(comissoes)} comissões")
         
         return jsonify({
             'sucesso': True,

@@ -665,6 +665,76 @@ async function carregarStatusParcela() {
     }
 }
 
+// ================================
+// FUNÇÕES DE MULTI-SELECT
+// ================================
+
+function toggleMultiSelect(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirst(filtroId)}`);
+    if (!container) return;
+    
+    // Fechar outros dropdowns abertos
+    document.querySelectorAll('.multi-select-container.open').forEach(c => {
+        if (c !== container) c.classList.remove('open');
+    });
+    
+    container.classList.toggle('open');
+}
+
+function capitalizeFirst(str) {
+    // Converte 'statusParcela' para 'StatusParcela'
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function updateMultiSelectText(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirst(filtroId)}`);
+    const textElement = document.getElementById(`text${capitalizeFirst(filtroId)}`);
+    if (!container || !textElement) return;
+    
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    
+    if (checkboxes.length === 0) {
+        textElement.textContent = 'Todos';
+    } else if (checkboxes.length === 1) {
+        // Pegar o texto do label (o texto após o checkbox)
+        const label = checkboxes[0].closest('label');
+        textElement.textContent = label ? label.textContent.trim() : checkboxes[0].value;
+    } else {
+        textElement.textContent = `${checkboxes.length} selecionados`;
+    }
+}
+
+function getMultiSelectValues(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirst(filtroId)}`);
+    if (!container) return [];
+    
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+function clearMultiSelect(filtroId) {
+    const container = document.getElementById(`container${capitalizeFirst(filtroId)}`);
+    if (!container) return;
+    
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+    updateMultiSelectText(filtroId);
+}
+
+// Fechar dropdowns ao clicar fora
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.multi-select-container')) {
+        document.querySelectorAll('.multi-select-container.open').forEach(c => {
+            c.classList.remove('open');
+        });
+    }
+});
+
+// ================================
+// PÁGINA: VISUALIZAR COMISSÕES
+// ================================
+
 async function buscarComissoes() {
     const loading = document.getElementById('loadingComissoes');
     const tabelaContainer = document.getElementById('tabelaComissoesContainer');
@@ -673,14 +743,23 @@ async function buscarComissoes() {
     if (tabelaContainer) tabelaContainer.style.display = 'none';
     
     try {
-        const statusParcela = document.getElementById('filtroStatusParcela')?.value || '';
-        const gatilhoAtingido = document.getElementById('filtroGatilho')?.value || '';
-        const statusAprovacao = document.getElementById('filtroStatusAprovacao')?.value || '';
+        // Obter valores dos multi-selects
+        const statusParcela = getMultiSelectValues('statusParcela');
+        const gatilhoAtingido = getMultiSelectValues('gatilho');
+        const statusAprovacao = getMultiSelectValues('statusAprovacao');
+        
+        // Obter filtros de data
+        const dataInicio = document.getElementById('filtroDataInicio')?.value || '';
+        const dataFim = document.getElementById('filtroDataFim')?.value || '';
         
         let url = '/api/comissoes/listar?';
-        if (statusParcela) url += `status_parcela=${statusParcela}&`;
-        if (gatilhoAtingido) url += `gatilho_atingido=${gatilhoAtingido}&`;
-        if (statusAprovacao) url += `status_aprovacao=${statusAprovacao}&`;
+        
+        // Enviar arrays como valores separados por vírgula
+        if (statusParcela.length > 0) url += `status_parcela=${statusParcela.join(',')}&`;
+        if (gatilhoAtingido.length > 0) url += `gatilho_atingido=${gatilhoAtingido.join(',')}&`;
+        if (statusAprovacao.length > 0) url += `status_aprovacao=${statusAprovacao.join(',')}&`;
+        if (dataInicio) url += `data_inicio=${dataInicio}&`;
+        if (dataFim) url += `data_fim=${dataFim}&`;
         
         const response = await fetchComRetry(url);
         const data = await response.json();
@@ -690,14 +769,35 @@ async function buscarComissoes() {
         if (data.sucesso && data.comissoes) {
             renderizarTabelaComissoes(data.comissoes);
             if (tabelaContainer) tabelaContainer.style.display = 'block';
+            
+            // Mostrar contagem de resultados
+            const total = data.total || data.comissoes.length;
+            showAlert(`${total} comissões encontradas`, 'info');
         } else {
             showAlert('Nenhuma comissão encontrada', 'info');
+            const tbody = document.getElementById('corpoTabelaComissoes');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 2rem; color: #888;">Nenhuma comissão encontrada com os filtros selecionados</td></tr>';
+            }
+            if (tabelaContainer) tabelaContainer.style.display = 'block';
         }
     } catch (error) {
         console.error('Erro ao buscar comissões:', error);
         if (loading) loading.style.display = 'none';
         showAlert('Erro ao carregar comissões', 'error');
     }
+}
+
+function traduzirStatusAprovacao(status) {
+    if (!status) return 'Aguardando liberação';
+    
+    const statusLower = status.toLowerCase().trim();
+    
+    if (statusLower === 'pendente') return 'Aguardando liberação';
+    if (statusLower === 'pendente de aprovação') return 'Em análise da direção';
+    
+    // Retorna o status original para outros casos (Aprovada, Rejeitada, etc.)
+    return status;
 }
 
 function renderizarTabelaComissoes(comissoes) {
@@ -710,6 +810,7 @@ function renderizarTabelaComissoes(comissoes) {
     tbody.innerHTML = comissoes.map(c => {
         const atingiuGatilho = c.atingiu_gatilho;
         const statusAprovacao = c.status_aprovacao || 'Pendente';
+        const statusAprovacaoExibicao = traduzirStatusAprovacao(statusAprovacao);
         const isPendente = statusAprovacao === 'Pendente';
         const destacar = isPendente && atingiuGatilho;
         
@@ -727,12 +828,13 @@ function renderizarTabelaComissoes(comissoes) {
                 <td>${corrigirEspacamentoNome(c.broker_nome)}</td>
                 <td>${c.enterprise_name || '-'}</td>
                 <td>${c.unit_name || '-'}</td>
+                <td>${formatDate(c.data_contrato)}</td>
                 <td>${corrigirEspacamentoNome(c.customer_name)}</td>
                 <td>${formatCurrency(c.valor_comissao || c.commission_value)}</td>
                 <td>${formatCurrency(c.valor_pago || 0)}</td>
                 <td>${formatCurrency(c.valor_gatilho)}</td>
                 <td class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
-                <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacao}</span></td>
+                <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacaoExibicao}</span></td>
                 <td style="text-align: center;">
                     ${isPendente ? `
                         <button 
@@ -773,12 +875,13 @@ function getStatusParcelaClass(status) {
 }
 
 function getStatusAprovacaoClass(status) {
-    if (!status) return 'badge-info';
+    if (!status) return 'badge-secondary';
     const s = status.toLowerCase();
     if (s.includes('aprovad')) return 'badge-success';
     if (s.includes('pendente de aprovação')) return 'badge-warning';
     if (s.includes('rejeitad')) return 'badge-danger';
     if (s.includes('pag')) return 'badge-info';
+    if (s === 'pendente') return 'badge-secondary';
     return 'badge-secondary';
 }
 
@@ -924,13 +1027,16 @@ async function enviarParaAprovacao() {
 }
 
 function limparFiltrosComissoes() {
-    const filtroStatus = document.getElementById('filtroStatusParcela');
-    const filtroGatilho = document.getElementById('filtroGatilho');
-    const filtroAprovacao = document.getElementById('filtroStatusAprovacao');
+    // Limpar multi-selects
+    clearMultiSelect('statusParcela');
+    clearMultiSelect('gatilho');
+    clearMultiSelect('statusAprovacao');
     
-    if (filtroStatus) filtroStatus.value = '';
-    if (filtroGatilho) filtroGatilho.value = '';
-    if (filtroAprovacao) filtroAprovacao.value = '';
+    // Limpar campos de data
+    const dataInicio = document.getElementById('filtroDataInicio');
+    const dataFim = document.getElementById('filtroDataFim');
+    if (dataInicio) dataInicio.value = '';
+    if (dataFim) dataFim.value = '';
     
     buscarComissoes();
 }
@@ -1600,6 +1706,18 @@ async function inicializarSistema() {
 
 let dadosRelatorio = [];
 
+// Função auxiliar para preencher dropdown multi-select
+function populateMultiSelect(filtroId, options, valueField = 'id', textField = 'nome') {
+    const dropdown = document.getElementById(`dropdown${capitalizeFirst(filtroId)}`);
+    if (!dropdown || !options) return;
+    
+    dropdown.innerHTML = options.map(opt => `
+        <label class="multi-select-option">
+            <input type="checkbox" value="${opt[valueField] || opt}" onchange="updateMultiSelectText('${filtroId}')"> ${opt[textField] || opt}
+        </label>
+    `).join('');
+}
+
 // Carregar filtros do relatório
 window.carregarFiltrosRelatorio = async function() {
     try {
@@ -1607,45 +1725,24 @@ window.carregarFiltrosRelatorio = async function() {
         const empreendimentosResponse = await fetch('/api/empreendimentos');
         const empreendimentos = await empreendimentosResponse.json();
         
-        const selectEmpreendimento = document.getElementById('filtroRelatorioEmpreendimento');
-        if (selectEmpreendimento && Array.isArray(empreendimentos)) {
-            selectEmpreendimento.innerHTML = '<option value="">Todos</option>';
-            empreendimentos.forEach(emp => {
-                const option = document.createElement('option');
-                option.value = emp.id;
-                option.textContent = emp.nome;
-                selectEmpreendimento.appendChild(option);
-            });
+        if (Array.isArray(empreendimentos)) {
+            populateMultiSelect('relatorioEmpreendimento', empreendimentos, 'id', 'nome');
         }
         
         // Carregar corretores
         const corretoresResponse = await fetch('/api/relatorio-comissoes/corretores');
         const corretores = await corretoresResponse.json();
         
-        const selectCorretor = document.getElementById('filtroRelatorioCorretor');
-        if (selectCorretor && Array.isArray(corretores)) {
-            selectCorretor.innerHTML = '<option value="">Todos</option>';
-            corretores.forEach(cor => {
-                const option = document.createElement('option');
-                option.value = cor.id;
-                option.textContent = cor.nome;
-                selectCorretor.appendChild(option);
-            });
+        if (Array.isArray(corretores)) {
+            populateMultiSelect('relatorioCorretor', corretores, 'id', 'nome');
         }
         
         // Carregar regras
         const regrasResponse = await fetch('/api/regras-gatilho');
         const regras = await regrasResponse.json();
         
-        const selectRegra = document.getElementById('filtroRelatorioRegra');
-        if (selectRegra && Array.isArray(regras)) {
-            selectRegra.innerHTML = '<option value="">Todas</option>';
-            regras.forEach(regra => {
-                const option = document.createElement('option');
-                option.value = regra.id;
-                option.textContent = regra.nome;
-                selectRegra.appendChild(option);
-            });
+        if (Array.isArray(regras)) {
+            populateMultiSelect('relatorioRegra', regras, 'id', 'nome');
         }
     } catch (error) {
         console.error('Erro ao carregar filtros do relatório:', error);
@@ -1671,20 +1768,27 @@ window.carregarRelatorioComissoes = async function() {
     tbody.innerHTML = '';
     
     try {
-        // Coletar filtros
-        const params = new URLSearchParams();
+        // Obter valores dos multi-selects
+        const empreendimentos = getMultiSelectValues('relatorioEmpreendimento');
+        const corretores = getMultiSelectValues('relatorioCorretor');
+        const regras = getMultiSelectValues('relatorioRegra');
+        const auditorias = getMultiSelectValues('relatorioAuditoria');
         
-        const empreendimento = document.getElementById('filtroRelatorioEmpreendimento')?.value;
-        const corretor = document.getElementById('filtroRelatorioCorretor')?.value;
-        const regra = document.getElementById('filtroRelatorioRegra')?.value;
-        const auditoria = document.getElementById('filtroRelatorioAuditoria')?.value;
+        // Obter filtros de data
+        const dataInicio = document.getElementById('filtroRelatorioDataInicio')?.value || '';
+        const dataFim = document.getElementById('filtroRelatorioDataFim')?.value || '';
         
-        if (empreendimento) params.append('empreendimento_id', empreendimento);
-        if (corretor) params.append('corretor_id', corretor);
-        if (regra) params.append('regra_id', regra);
-        if (auditoria) params.append('auditoria', auditoria);
+        // Montar URL com filtros
+        let url = '/api/relatorio-comissoes?';
         
-        const response = await fetch(`/api/relatorio-comissoes?${params.toString()}`);
+        if (empreendimentos.length > 0) url += `empreendimento_id=${empreendimentos.join(',')}&`;
+        if (corretores.length > 0) url += `corretor_id=${corretores.join(',')}&`;
+        if (regras.length > 0) url += `regra_id=${regras.join(',')}&`;
+        if (auditorias.length > 0) url += `auditoria=${auditorias.join(',')}&`;
+        if (dataInicio) url += `data_inicio=${dataInicio}&`;
+        if (dataFim) url += `data_fim=${dataFim}&`;
+        
+        const response = await fetch(url);
         const result = await response.json();
         
         if (loading) loading.style.display = 'none';
@@ -1777,10 +1881,17 @@ function renderizarTabelaRelatorio(dados) {
 
 // Limpar filtros do relatório
 window.limparFiltrosRelatorio = function() {
-    document.getElementById('filtroRelatorioEmpreendimento').value = '';
-    document.getElementById('filtroRelatorioCorretor').value = '';
-    document.getElementById('filtroRelatorioRegra').value = '';
-    document.getElementById('filtroRelatorioAuditoria').value = '';
+    // Limpar multi-selects
+    clearMultiSelect('relatorioEmpreendimento');
+    clearMultiSelect('relatorioCorretor');
+    clearMultiSelect('relatorioRegra');
+    clearMultiSelect('relatorioAuditoria');
+    
+    // Limpar campos de data
+    const dataInicio = document.getElementById('filtroRelatorioDataInicio');
+    const dataFim = document.getElementById('filtroRelatorioDataFim');
+    if (dataInicio) dataInicio.value = '';
+    if (dataFim) dataFim.value = '';
     
     // Limpar tabela
     const tbody = document.getElementById('corpoTabelaRelatorio');
