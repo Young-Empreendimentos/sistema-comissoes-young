@@ -276,22 +276,46 @@ class SiengeClient:
         return all_buildings
     
     def get_bill_prv(self, document_number: str) -> Optional[Dict]:
-        """Busca título a pagar PRV (ITBI) pelo número do documento"""
+        """Busca título a pagar PRV (ITBI) pelo número do documento - tenta vários formatos"""
+        # Tentar diferentes formatos do número
+        formatos = [
+            document_number,                          # Original: "46"
+            document_number.lstrip('0') or '0',       # Sem zeros: "46" de "046"
+            f"Lote {document_number}",                # Com Lote: "Lote 46"
+            f"Lote {document_number.lstrip('0') or '0'}",  # Lote sem zeros
+        ]
+        
+        for fmt in formatos:
+            try:
+                params = {
+                    'companyId': self.company_id,
+                    'documentId': 'PRV',
+                    'documentNumber': fmt,
+                    'startDate': '2020-01-01',
+                    'endDate': '2030-12-31',
+                    'limit': 10
+                }
+                result = self._make_request_silent('bills', params)
+                if result and 'results' in result and result['results']:
+                    return result['results'][0]
+            except:
+                pass
+        return None
+    
+    def _make_request_silent(self, endpoint: str, params: dict = None) -> Optional[dict]:
+        """Faz requisição à API do Sienge sem mostrar erros (para buscas opcionais)"""
         try:
-            params = {
-                'companyId': self.company_id,
-                'documentId': 'PRV',
-                'documentNumber': document_number,
-                'startDate': '2020-01-01',
-                'endDate': '2030-12-31',
-                'limit': 10
-            }
-            result = self._make_request('bills', params)
-            if result and 'results' in result and result['results']:
-                return result['results'][0]
+            url = f"{self.base_url}/{endpoint}"
+            response = requests.get(
+                url,
+                auth=self.auth,
+                params=params,
+                timeout=self.timeout
+            )
+            if response.status_code == 200:
+                return response.json()
             return None
-        except Exception as e:
-            print(f"Erro ao buscar PRV: {str(e)}")
+        except:
             return None
     
     def get_bills_prv_all_companies(self, document_number: str) -> Optional[Dict]:
