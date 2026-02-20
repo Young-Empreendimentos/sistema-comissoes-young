@@ -147,22 +147,29 @@ class SiengeSupabaseSync:
             pagos = 0
             
             for commission in commissions:
-                # Verificar se a comissão está cancelada ou paga (campo installmentStatus)
+                # Verificar se a comissão está cancelada ou paga
+                # Na v1, verificamos pelo campo cancelledValue e paymentBills
                 status = (commission.get('installmentStatus') or commission.get('status') or '').upper()
+                cancelled_value = commission.get('cancelledValue') or 0
                 
-                # Ignorar comissões canceladas
-                if 'CANCEL' in status:
+                # Ignorar comissões canceladas (por status ou por valor cancelado)
+                is_cancelled = 'CANCEL' in status or cancelled_value > 0
+                if is_cancelled:
                     # Deletar do Supabase se existir
                     try:
+                        sienge_id = commission.get('commissionId') or commission.get('id')
                         self.supabase.table('sienge_comissoes').delete()\
-                            .eq('sienge_id', commission.get('id')).execute()
+                            .eq('sienge_id', sienge_id).execute()
                     except:
                         pass
                     cancelados += 1
                     continue
                 
                 # Comissões pagas são automaticamente marcadas como Aprovadas
-                is_paga = 'PAID' in status or 'PAGO' in status
+                # Na v1, verificamos pelo paymentBills ou releaseValue
+                release_value = commission.get('releaseValue') or 0
+                payment_bills = commission.get('paymentBills') or []
+                is_paga = 'PAID' in status or 'PAGO' in status or release_value > 0 or len(payment_bills) > 0
                 if is_paga:
                     pagos += 1
                 
@@ -173,9 +180,10 @@ class SiengeSupabaseSync:
                 else:
                     status_aprovacao = 'Pendente'
                     try:
+                        sienge_id = commission.get('commissionId') or commission.get('id')
                         existing = self.supabase.table('sienge_comissoes')\
                             .select('status_aprovacao')\
-                            .eq('sienge_id', commission.get('id'))\
+                            .eq('sienge_id', sienge_id)\
                             .limit(1).execute()
                         if existing.data and existing.data[0].get('status_aprovacao'):
                             status_aprovacao = existing.data[0]['status_aprovacao']
@@ -200,18 +208,18 @@ class SiengeSupabaseSync:
                     print(f"[Sync DEBUG] Valor encontrado: {valor_comissao}")
                 
                 data = {
-                    'sienge_id': commission.get('id'),
-                    'numero_contrato': commission.get('contractNumber'),
-                    'building_id': commission.get('buildingId'),
+                    'sienge_id': commission.get('commissionId') or commission.get('id'),
+                    'numero_contrato': commission.get('salesContractNumber') or commission.get('contractNumber'),
+                    'building_id': commission.get('enterpriseId') or commission.get('buildingId'),
                     'company_id': commission.get('companyId'),
                     'broker_id': commission.get('brokerId'),
                     'broker_nome': commission.get('brokerName'),
                     'customer_name': commission.get('customerName'),
                     'enterprise_name': commission.get('enterpriseName') or commission.get('buildingName'),
-                    'unit_name': commission.get('unitName'),
+                    'unit_name': commission.get('unitName') or commission.get('billNumber'),
                     'commission_value': valor_comissao,
-                    'installment_status': commission.get('installmentStatus') or commission.get('status'),
-                    'commission_date': commission.get('commissionDate') or commission.get('date'),
+                    'installment_status': commission.get('installmentStatus') or commission.get('status') or 'PENDING',
+                    'commission_date': commission.get('contractDate') or commission.get('issueDate') or commission.get('commissionDate'),
                     'status_aprovacao': status_aprovacao,
                     'atualizado_em': datetime.now().isoformat()
                 }

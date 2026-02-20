@@ -107,16 +107,20 @@ class SiengeClient:
             return None
     
     def get_brokers(self, building_id: int = None) -> List[Dict]:
-        """Busca corretores"""
+        """Busca corretores - Extrai dos broker-commissions (endpoint brokers não existe na v1)"""
         try:
-            params = {'companyId': self.company_id}
-            if building_id:
-                params['buildingId'] = building_id
-            
-            result = self._make_request('brokers', params)
-            if result and 'resultSetMetadata' in result:
-                return result.get('results', [])
-            return result if isinstance(result, list) else []
+            # Na v1, não existe endpoint /brokers, extraímos dos broker-commissions
+            commissions = self.get_all_commissions_paginated(building_id=building_id)
+            brokers_dict = {}
+            for c in commissions:
+                broker_id = c.get('brokerId')
+                if broker_id and broker_id not in brokers_dict:
+                    brokers_dict[broker_id] = {
+                        'id': broker_id,
+                        'name': c.get('brokerName'),
+                        'companyId': c.get('companyId')
+                    }
+            return list(brokers_dict.values())
         except Exception as e:
             print(f"Erro ao buscar corretores: {str(e)}")
             return []
@@ -174,15 +178,11 @@ class SiengeClient:
             return []
     
     def get_receivables(self, contract_id: int) -> List[Dict]:
-        """Busca parcelas/recebíveis de um contrato"""
-        try:
-            result = self._make_request(f'sales-contracts/{contract_id}/receivables')
-            if result and 'resultSetMetadata' in result:
-                return result.get('results', [])
-            return result if isinstance(result, list) else []
-        except Exception as e:
-            print(f"Erro ao buscar recebíveis: {str(e)}")
-            return []
+        """Busca parcelas/recebíveis de um contrato - Endpoint não disponível na v1"""
+        # Na v1 da API Sienge, o endpoint de receivables não está disponível
+        # Os dados de parcelas vêm através de broker-commissions (paymentBills)
+        print(f"[AVISO] Endpoint receivables não disponível na v1 da API Sienge")
+        return []
     
     def get_all_contracts_paginated(self, building_id: int = None) -> List[Dict]:
         """Busca todos os contratos com paginação automática"""
