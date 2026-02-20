@@ -68,32 +68,42 @@ class SiengeSupabaseSync:
             cancelados = 0
             
             for contract in contracts:
-                # Verificar se o contrato está cancelado/distratado
-                status = (contract.get('status') or '').lower()
+                # Na v1, campo mudou de 'status' para 'situation'
+                status = (contract.get('situation') or contract.get('status') or '').lower()
                 if any(x in status for x in ['cancel', 'distrat', 'rescind']):
                     # Deletar do Supabase se existir
                     try:
                         self.supabase.table('sienge_contratos').delete()\
                             .eq('sienge_id', contract.get('id')).execute()
+                        numero = contract.get('number') or contract.get('contractNumber')
+                        enterprise = contract.get('enterpriseId') or contract.get('buildingId')
                         self.supabase.table('sienge_comissoes').delete()\
-                            .eq('numero_contrato', contract.get('contractNumber'))\
-                            .eq('building_id', contract.get('buildingId')).execute()
+                            .eq('numero_contrato', numero)\
+                            .eq('building_id', enterprise).execute()
                     except:
                         pass
                     cancelados += 1
                     continue
                 
+                # Extrair nome do cliente de salesContractCustomers (v1)
+                customers = contract.get('salesContractCustomers') or []
+                customer_name = customers[0].get('name') if customers else contract.get('customerName')
+                
+                # Extrair unidade de salesContractUnits (v1)
+                units = contract.get('salesContractUnits') or []
+                unit_name = units[0].get('name') if units else contract.get('unitName')
+                
                 data = {
                     'sienge_id': contract.get('id'),
-                    'numero_contrato': contract.get('contractNumber'),
-                    'building_id': contract.get('buildingId'),
+                    'numero_contrato': contract.get('number') or contract.get('contractNumber'),
+                    'building_id': contract.get('enterpriseId') or contract.get('buildingId'),
                     'company_id': contract.get('companyId'),
-                    'nome_cliente': contract.get('customerName'),
+                    'nome_cliente': customer_name,
                     'data_contrato': contract.get('contractDate'),
-                    'valor_total': contract.get('totalValue'),
-                    'valor_a_vista': contract.get('cashValue') or contract.get('totalValue'),
-                    'status': contract.get('status'),
-                    'unidade': contract.get('unitName'),
+                    'valor_total': contract.get('totalSellingValue') or contract.get('value') or contract.get('totalValue'),
+                    'valor_a_vista': contract.get('value') or contract.get('totalSellingValue'),
+                    'status': contract.get('situation') or contract.get('status'),
+                    'unidade': unit_name,
                     'atualizado_em': datetime.now().isoformat()
                 }
                 
