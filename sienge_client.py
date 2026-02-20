@@ -16,7 +16,8 @@ class SiengeClient:
     """Cliente para API do Sienge"""
     
     def __init__(self):
-        self.base_url = os.getenv('SIENGE_BASE_URL', 'https://api.sienge.com.br/youngemp/public/api')
+        # URL atualizada para v1 (mudança do Sienge em 2026)
+        self.base_url = os.getenv('SIENGE_BASE_URL', 'https://api.sienge.com.br/youngemp/public/api/v1')
         self.username = os.getenv('SIENGE_USERNAME')
         self.password = os.getenv('SIENGE_PASSWORD')
         self.company_id = os.getenv('SIENGE_COMPANY_ID', '5')
@@ -42,7 +43,8 @@ class SiengeClient:
     def get_buildings(self) -> List[Dict]:
         """Busca todos os empreendimentos"""
         try:
-            result = self._make_request('buildings', {'companyId': self.company_id})
+            # Endpoint renomeado de 'buildings' para 'enterprises' na v1
+            result = self._make_request('enterprises', {'companyId': self.company_id})
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
             return result if isinstance(result, list) else []
@@ -53,8 +55,10 @@ class SiengeClient:
     def get_building_units(self, building_id: int) -> List[Dict]:
         """Busca unidades de um empreendimento"""
         try:
-            result = self._make_request(f'buildings/{building_id}/units', {
-                'companyId': self.company_id
+            # Endpoint mudou na v1: de 'buildings/{id}/units' para 'units?enterpriseId={id}'
+            result = self._make_request('units', {
+                'companyId': self.company_id,
+                'enterpriseId': building_id
             })
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
