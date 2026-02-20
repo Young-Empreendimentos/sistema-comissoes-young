@@ -21,6 +21,9 @@ class SiengeClient:
         self.username = os.getenv('SIENGE_USERNAME')
         self.password = os.getenv('SIENGE_PASSWORD')
         self.company_id = os.getenv('SIENGE_COMPANY_ID', '5')
+        # Lista de todas as empresas para sincronizar
+        company_ids_str = os.getenv('SIENGE_COMPANY_IDS', '5')
+        self.all_company_ids = [c.strip() for c in company_ids_str.split(',') if c.strip()]
         self.auth = HTTPBasicAuth(self.username, self.password)
         self.timeout = 30
     
@@ -214,6 +217,63 @@ class SiengeClient:
             offset += limit
         
         return all_commissions
+    
+    def get_commissions_all_companies(self) -> List[Dict]:
+        """Busca comissões de TODAS as empresas cadastradas"""
+        all_commissions = []
+        original_company_id = self.company_id
+        
+        for company_id in self.all_company_ids:
+            self.company_id = company_id
+            try:
+                commissions = self.get_all_commissions_paginated()
+                if commissions:
+                    print(f"[Sienge] Empresa {company_id}: {len(commissions)} comissões")
+                    all_commissions.extend(commissions)
+            except Exception as e:
+                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
+        
+        self.company_id = original_company_id
+        print(f"[Sienge] Total de comissões (todas empresas): {len(all_commissions)}")
+        return all_commissions
+    
+    def get_contracts_all_companies(self) -> List[Dict]:
+        """Busca contratos de TODAS as empresas cadastradas"""
+        all_contracts = []
+        original_company_id = self.company_id
+        
+        for company_id in self.all_company_ids:
+            self.company_id = company_id
+            try:
+                contracts = self.get_all_contracts_paginated()
+                if contracts:
+                    print(f"[Sienge] Empresa {company_id}: {len(contracts)} contratos")
+                    all_contracts.extend(contracts)
+            except Exception as e:
+                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
+        
+        self.company_id = original_company_id
+        print(f"[Sienge] Total de contratos (todas empresas): {len(all_contracts)}")
+        return all_contracts
+    
+    def get_buildings_all_companies(self) -> List[Dict]:
+        """Busca empreendimentos de TODAS as empresas cadastradas"""
+        all_buildings = []
+        original_company_id = self.company_id
+        
+        for company_id in self.all_company_ids:
+            self.company_id = company_id
+            try:
+                buildings = self.get_buildings()
+                if buildings:
+                    print(f"[Sienge] Empresa {company_id}: {len(buildings)} empreendimentos")
+                    all_buildings.extend(buildings)
+            except Exception as e:
+                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
+        
+        self.company_id = original_company_id
+        print(f"[Sienge] Total de empreendimentos (todas empresas): {len(all_buildings)}")
+        return all_buildings
 
 
 # Instância global

@@ -34,9 +34,10 @@ class SiengeSupabaseSync:
         self.sienge = sienge_client
     
     def sync_empreendimentos(self) -> dict:
-        """Sincroniza empreendimentos do Sienge"""
+        """Sincroniza empreendimentos do Sienge (todas as empresas)"""
         try:
-            buildings = self.sienge.get_buildings()
+            # Buscar empreendimentos de TODAS as empresas
+            buildings = self.sienge.get_buildings_all_companies()
             count = 0
             
             for building in buildings:
@@ -61,9 +62,10 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_contratos(self, building_id: int = None) -> dict:
-        """Sincroniza contratos do Sienge (ignora cancelados/distratados)"""
+        """Sincroniza contratos do Sienge (ignora cancelados/distratados) - todas as empresas"""
         try:
-            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
+            # Buscar contratos de TODAS as empresas
+            contracts = self.sienge.get_contracts_all_companies()
             count = 0
             cancelados = 0
             
@@ -148,9 +150,10 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_comissoes(self, building_id: int = None) -> dict:
-        """Sincroniza comissões do Sienge (ignora cancelados)"""
+        """Sincroniza comissões do Sienge (ignora cancelados) - todas as empresas"""
         try:
-            commissions = self.sienge.get_all_commissions_paginated(building_id=building_id)
+            # Buscar comissões de TODAS as empresas
+            commissions = self.sienge.get_commissions_all_companies()
             count = 0
             cancelados = 0
             
