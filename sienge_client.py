@@ -274,6 +274,94 @@ class SiengeClient:
         self.company_id = original_company_id
         print(f"[Sienge] Total de empreendimentos (todas empresas): {len(all_buildings)}")
         return all_buildings
+    
+    def get_bill_prv(self, document_number: str) -> Optional[Dict]:
+        """Busca título a pagar PRV (ITBI) pelo número do documento"""
+        try:
+            params = {
+                'companyId': self.company_id,
+                'documentId': 'PRV',
+                'documentNumber': document_number,
+                'startDate': '2020-01-01',
+                'endDate': '2030-12-31',
+                'limit': 10
+            }
+            result = self._make_request('bills', params)
+            if result and 'results' in result and result['results']:
+                return result['results'][0]
+            return None
+        except Exception as e:
+            print(f"Erro ao buscar PRV: {str(e)}")
+            return None
+    
+    def get_bills_prv_all_companies(self, document_number: str) -> Optional[Dict]:
+        """Busca título PRV em TODAS as empresas"""
+        original_company_id = self.company_id
+        
+        for company_id in self.all_company_ids:
+            self.company_id = company_id
+            try:
+                bill = self.get_bill_prv(document_number)
+                if bill:
+                    self.company_id = original_company_id
+                    return bill
+            except:
+                pass
+        
+        self.company_id = original_company_id
+        return None
+    
+    def get_receivable_bills(self, offset: int = 0, limit: int = 100) -> List[Dict]:
+        """Busca títulos a receber (valores pagos)"""
+        try:
+            params = {
+                'companyId': self.company_id,
+                'offset': offset,
+                'limit': limit
+            }
+            result = self._make_request('accounts-receivable/receivable-bills', params)
+            if result and 'results' in result:
+                return result.get('results', [])
+            return result if isinstance(result, list) else []
+        except Exception as e:
+            print(f"Erro ao buscar receivable-bills: {str(e)}")
+            return []
+    
+    def get_all_receivable_bills_paginated(self) -> List[Dict]:
+        """Busca todos os títulos a receber com paginação"""
+        all_bills = []
+        offset = 0
+        limit = 100
+        
+        while True:
+            bills = self.get_receivable_bills(offset=offset, limit=limit)
+            if not bills:
+                break
+            all_bills.extend(bills)
+            if len(bills) < limit:
+                break
+            offset += limit
+        
+        return all_bills
+    
+    def get_receivable_bills_all_companies(self) -> List[Dict]:
+        """Busca títulos a receber de TODAS as empresas"""
+        all_bills = []
+        original_company_id = self.company_id
+        
+        for company_id in self.all_company_ids:
+            self.company_id = company_id
+            try:
+                bills = self.get_all_receivable_bills_paginated()
+                if bills:
+                    print(f"[Sienge] Empresa {company_id}: {len(bills)} títulos a receber")
+                    all_bills.extend(bills)
+            except Exception as e:
+                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
+        
+        self.company_id = original_company_id
+        print(f"[Sienge] Total de títulos a receber (todas empresas): {len(all_bills)}")
+        return all_bills
 
 
 # Instância global

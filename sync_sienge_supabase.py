@@ -251,56 +251,78 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_itbi(self, building_id: int = None) -> dict:
-        """Sincroniza valores de ITBI - todas as empresas (busca detalhes de cada contrato)"""
+        """Sincroniza valores de ITBI - busca no endpoint /bills com documento PRV"""
         try:
-            # Buscar lista de contratos
-            contracts = self.sienge.get_contracts_all_companies()
-            count = 0
-            total = len(contracts)
+            # Buscar contratos que já estão no Supabase
+            result = self.supabase.table('sienge_contratos')\
+                .select('numero_contrato, building_id, company_id')\
+                .execute()
             
-            for idx, contract in enumerate(contracts, 1):
-                contract_id = contract.get('id')
-                if not contract_id:
+            contratos = result.data if result.data else []
+            count = 0
+            total = len(contratos)
+            erros = 0
+            
+            # Verificar quais já têm ITBI no Supabase
+            result_itbi = self.supabase.table('sienge_itbi')\
+                .select('numero_contrato, building_id')\
+                .execute()
+            
+            itbi_existentes = set()
+            for item in (result_itbi.data or []):
+                chave = f"{item.get('numero_contrato')}_{item.get('building_id')}"
+                itbi_existentes.add(chave)
+            
+            print(f"[ITBI] {len(itbi_existentes)} contratos já possuem ITBI no Supabase")
+            
+            original_company_id = self.sienge.company_id
+            
+            for idx, contrato in enumerate(contratos, 1):
+                numero = contrato.get('numero_contrato')
+                bid = contrato.get('building_id')
+                company_id = contrato.get('company_id')
+                
+                if not numero:
                     continue
                 
-                # Buscar detalhes do contrato para obter ITBI
-                try:
-                    details = self.sienge.get_contract_details(contract_id)
-                    if not details:
-                        continue
-                    
-                    # ITBI pode estar em vários campos possíveis
-                    itbi_value = (
-                        details.get('itbiValue') or 
-                        details.get('taxValue') or 
-                        details.get('transferTaxValue') or
-                        0
-                    )
-                    
-                    if itbi_value and float(itbi_value) > 0:
-                        data = {
-                            'numero_contrato': details.get('number') or details.get('contractNumber'),
-                            'building_id': details.get('enterpriseId') or details.get('buildingId'),
-                            'valor_itbi': float(itbi_value),
-                            'atualizado_em': datetime.now().isoformat()
-                        }
-                        
-                        self.supabase.table('sienge_itbi').upsert(
-                            data,
-                            on_conflict='numero_contrato,building_id'
-                        ).execute()
-                        count += 1
-                        
-                except Exception as e:
-                    # Erro ao buscar detalhes, continuar com próximo
-                    pass
+                # Pular se já tem ITBI
+                chave = f"{numero}_{bid}"
+                if chave in itbi_existentes:
+                    continue
                 
-                # Progresso a cada 100 contratos
-                if idx % 100 == 0:
+                # Buscar PRV com o número do contrato
+                try:
+                    self.sienge.company_id = str(company_id) if company_id else original_company_id
+                    bill = self.sienge.get_bill_prv(str(numero))
+                    
+                    if bill:
+                        itbi_value = bill.get('totalInvoiceAmount') or 0
+                        
+                        if itbi_value and float(itbi_value) > 0:
+                            data = {
+                                'numero_contrato': numero,
+                                'building_id': bid,
+                                'valor_itbi': float(itbi_value),
+                                'atualizado_em': datetime.now().isoformat()
+                            }
+                            
+                            self.supabase.table('sienge_itbi').upsert(
+                                data,
+                                on_conflict='numero_contrato,building_id'
+                            ).execute()
+                            count += 1
+                            print(f"[ITBI] Contrato {numero}: R$ {itbi_value}")
+                            
+                except Exception as e:
+                    erros += 1
+                
+                # Progresso a cada 50 contratos
+                if idx % 50 == 0:
                     print(f"[ITBI] Processados {idx}/{total} contratos, {count} com ITBI")
             
-            print(f"[ITBI] Concluído: {count} contratos com ITBI de {total} total")
-            return {'sucesso': True, 'total': count}
+            self.sienge.company_id = original_company_id
+            print(f"[ITBI] Concluído: {count} novos ITBI de {total} contratos ({erros} erros)")
+            return {'sucesso': True, 'total': count, 'erros': erros}
         except Exception as e:
             print(f"Erro ao sincronizar ITBI: {str(e)}")
             return {'sucesso': False, 'erro': str(e)}
