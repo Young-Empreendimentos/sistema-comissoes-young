@@ -107,20 +107,15 @@ class SiengeClient:
             return None
     
     def get_brokers(self, building_id: int = None) -> List[Dict]:
-        """Busca corretores - Extrai dos broker-commissions (endpoint brokers não existe na v1)"""
+        """Busca corretores - Usa endpoint /commissions/configurations/brokers na v1"""
         try:
-            # Na v1, não existe endpoint /brokers, extraímos dos broker-commissions
-            commissions = self.get_all_commissions_paginated(building_id=building_id)
-            brokers_dict = {}
-            for c in commissions:
-                broker_id = c.get('brokerId')
-                if broker_id and broker_id not in brokers_dict:
-                    brokers_dict[broker_id] = {
-                        'id': broker_id,
-                        'name': c.get('brokerName'),
-                        'companyId': c.get('companyId')
-                    }
-            return list(brokers_dict.values())
+            # Na v1, corretores ficam em /commissions/configurations/brokers
+            result = self._make_request('commissions/configurations/brokers', {
+                'companyId': self.company_id
+            })
+            if result and 'resultSetMetadata' in result:
+                return result.get('results', [])
+            return result if isinstance(result, list) else []
         except Exception as e:
             print(f"Erro ao buscar corretores: {str(e)}")
             return []
@@ -133,9 +128,10 @@ class SiengeClient:
                 'brokerId': broker_id
             }
             if building_id:
-                params['buildingId'] = building_id
+                params['enterpriseId'] = building_id
             
-            result = self._make_request('broker-commissions', params)
+            # Na v1, endpoint mudou de 'broker-commissions' para 'commissions'
+            result = self._make_request('commissions', params)
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
             return result if isinstance(result, list) else []
@@ -152,9 +148,10 @@ class SiengeClient:
                 'limit': limit
             }
             if building_id:
-                params['buildingId'] = building_id
+                params['enterpriseId'] = building_id
             
-            result = self._make_request('broker-commissions', params)
+            # Na v1, endpoint mudou de 'broker-commissions' para 'commissions'
+            result = self._make_request('commissions', params)
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
             return result if isinstance(result, list) else []
