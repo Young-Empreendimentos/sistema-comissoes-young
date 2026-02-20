@@ -279,11 +279,42 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_valores_pagos(self, building_id: int = None) -> dict:
-        """Sincroniza valores pagos dos contratos - DESATIVADO na API v1"""
-        # Na API v1 do Sienge, o endpoint receivables não está disponível
-        # Os valores pagos podem ser obtidos através das comissões (paymentBills)
-        print("[Sync] sync_valores_pagos desativado - endpoint receivables não disponível na v1")
-        return {'sucesso': True, 'total': 0, 'mensagem': 'Desativado na v1'}
+        """Sincroniza valores pagos dos contratos - usa paymentConditions na v1"""
+        try:
+            # Na v1, os valores pagos vêm no campo paymentConditions do contrato
+            contracts = self.sienge.get_contracts_all_companies()
+            count = 0
+            
+            for contract in contracts:
+                # Calcular valor pago a partir de paymentConditions
+                payment_conditions = contract.get('paymentConditions') or []
+                valor_pago = sum(
+                    float(pc.get('amountPaid', 0) or 0)
+                    for pc in payment_conditions
+                )
+                
+                if valor_pago > 0:
+                    data = {
+                        'numero_contrato': contract.get('number') or contract.get('contractNumber'),
+                        'building_id': contract.get('enterpriseId') or contract.get('buildingId'),
+                        'valor_pago': valor_pago,
+                        'atualizado_em': datetime.now().isoformat()
+                    }
+                    
+                    try:
+                        self.supabase.table('sienge_valor_pago').upsert(
+                            data,
+                            on_conflict='numero_contrato,building_id'
+                        ).execute()
+                        count += 1
+                    except Exception as e:
+                        # Tabela pode não existir, ignorar
+                        pass
+            
+            return {'sucesso': True, 'total': count}
+        except Exception as e:
+            print(f"Erro ao sincronizar valores pagos: {str(e)}")
+            return {'sucesso': False, 'erro': str(e)}
     
     def sync_all(self, building_id: int = None) -> dict:
         """Executa sincronização completa"""
