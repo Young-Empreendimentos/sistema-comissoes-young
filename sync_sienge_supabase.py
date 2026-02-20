@@ -157,8 +157,10 @@ class SiengeSupabaseSync:
             pagos = 0
             
             for commission in commissions:
+                # Na API v1, os campos usam ID maiúsculo: commissionID, enterpriseID, brokerID, etc
+                sienge_id = commission.get('commissionID') or commission.get('commissionId') or commission.get('id')
+                
                 # Verificar se a comissão está cancelada ou paga
-                # Na v1, verificamos pelo campo cancelledValue e paymentBills
                 status = (commission.get('installmentStatus') or commission.get('status') or '').upper()
                 cancelled_value = commission.get('cancelledValue') or 0
                 
@@ -167,16 +169,20 @@ class SiengeSupabaseSync:
                 if is_cancelled:
                     # Deletar do Supabase se existir
                     try:
-                        sienge_id = commission.get('commissionId') or commission.get('id')
-                        self.supabase.table('sienge_comissoes').delete()\
-                            .eq('sienge_id', sienge_id).execute()
+                        if sienge_id:
+                            self.supabase.table('sienge_comissoes').delete()\
+                                .eq('sienge_id', sienge_id).execute()
                     except:
                         pass
                     cancelados += 1
                     continue
                 
+                # Pular se não tem ID válido
+                if not sienge_id:
+                    print(f"[Sync AVISO] Comissão sem ID válido: {commission.get('brokerName')} - {commission.get('salesContractNumber')}")
+                    continue
+                
                 # Comissões pagas são automaticamente marcadas como Aprovadas
-                # Na v1, verificamos pelo paymentBills ou releaseValue
                 release_value = commission.get('releaseValue') or 0
                 payment_bills = commission.get('paymentBills') or []
                 is_paga = 'PAID' in status or 'PAGO' in status or release_value > 0 or len(payment_bills) > 0
@@ -184,13 +190,11 @@ class SiengeSupabaseSync:
                     pagos += 1
                 
                 # Buscar status de aprovação existente (para não sobrescrever)
-                # Se está paga, força status "Aprovada"
                 if is_paga:
                     status_aprovacao = 'Aprovada'
                 else:
                     status_aprovacao = 'Pendente'
                     try:
-                        sienge_id = commission.get('commissionId') or commission.get('id')
                         existing = self.supabase.table('sienge_comissoes')\
                             .select('status_aprovacao')\
                             .eq('sienge_id', sienge_id)\
@@ -200,36 +204,33 @@ class SiengeSupabaseSync:
                     except:
                         pass
                 
-                # Tentar múltiplos campos para o valor da comissão
+                # Valor da comissão - na v1 o campo é 'value'
                 valor_comissao = (
+                    commission.get('value') or 
                     commission.get('commissionValue') or 
                     commission.get('installmentValue') or 
-                    commission.get('value') or 
                     commission.get('totalValue') or
-                    commission.get('netValue') or
-                    commission.get('grossValue') or
-                    commission.get('amount') or
                     0
                 )
                 
                 # Log para debug (apenas primeira comissão não cancelada)
-                if count == 0 and valor_comissao:
+                if count == 0:
                     print(f"[Sync DEBUG] Campos da comissão: {list(commission.keys())}")
-                    print(f"[Sync DEBUG] Valor encontrado: {valor_comissao}")
+                    print(f"[Sync DEBUG] sienge_id={sienge_id}, valor={valor_comissao}")
                 
                 data = {
-                    'sienge_id': commission.get('commissionId') or commission.get('id'),
+                    'sienge_id': sienge_id,
                     'numero_contrato': commission.get('salesContractNumber') or commission.get('contractNumber'),
-                    'building_id': commission.get('enterpriseId') or commission.get('buildingId'),
+                    'building_id': commission.get('enterpriseID') or commission.get('enterpriseId') or commission.get('buildingId'),
                     'company_id': commission.get('companyId'),
-                    'broker_id': commission.get('brokerId'),
+                    'broker_id': commission.get('brokerID') or commission.get('brokerId'),
                     'broker_nome': commission.get('brokerName'),
                     'customer_name': commission.get('customerName'),
                     'enterprise_name': commission.get('enterpriseName') or commission.get('buildingName'),
-                    'unit_name': commission.get('unitName') or commission.get('billNumber'),
+                    'unit_name': commission.get('unitName'),
                     'commission_value': valor_comissao,
                     'installment_status': commission.get('installmentStatus') or commission.get('status') or 'PENDING',
-                    'commission_date': commission.get('contractDate') or commission.get('issueDate') or commission.get('commissionDate'),
+                    'commission_date': commission.get('dueDate') or commission.get('contractDate'),
                     'status_aprovacao': status_aprovacao,
                     'atualizado_em': datetime.now().isoformat()
                 }
