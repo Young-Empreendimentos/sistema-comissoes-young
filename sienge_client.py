@@ -277,15 +277,21 @@ class SiengeClient:
     
     def get_bill_prv(self, document_number: str) -> Optional[Dict]:
         """Busca título a pagar PRV (ITBI) pelo número do documento - tenta vários formatos"""
+        # Remover zeros à esquerda mantendo letras (ex: "0302C" -> "302C")
+        num_sem_zeros = document_number.lstrip('0') or document_number
+        
         # Tentar diferentes formatos do número
         formatos = [
-            document_number,                          # Original: "46"
-            document_number.lstrip('0') or '0',       # Sem zeros: "46" de "046"
+            document_number,                          # Original: "46" ou "302C"
+            num_sem_zeros,                            # Sem zeros: "302C" de "0302C"
             f"Lote {document_number}",                # Com Lote: "Lote 46"
-            f"Lote {document_number.lstrip('0') or '0'}",  # Lote sem zeros
+            f"Lote {num_sem_zeros}",                  # Lote sem zeros: "Lote 302C"
         ]
         
-        for fmt in formatos:
+        # Remover duplicatas mantendo ordem
+        formatos_unicos = list(dict.fromkeys(formatos))
+        
+        for fmt in formatos_unicos:
             try:
                 params = {
                     'companyId': self.company_id,
