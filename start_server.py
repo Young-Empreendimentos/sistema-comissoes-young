@@ -29,9 +29,9 @@ def main():
         print()
         print("=" * 60)
         if debug:
-            print("  ⚠️  MODO DEBUG ATIVO - NÃO USE EM PRODUÇÃO!")
+            print("  [AVISO] MODO DEBUG ATIVO - NAO USE EM PRODUCAO!")
         else:
-            print("  ✅ Modo produção (debug=False)")
+            print("  [OK] Modo producao (debug=False)")
         print(f"  Servidor em: http://localhost:{port}")
         print(f"  Ou: http://127.0.0.1:{port}")
         print("=" * 60)
