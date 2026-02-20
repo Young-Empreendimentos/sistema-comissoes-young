@@ -12,15 +12,25 @@ from sienge_client import sienge_client
 
 load_dotenv()
 
+# Conexão global do Supabase (evita criar nova conexão a cada requisição)
+_supabase_client = None
+
+def get_supabase_client():
+    """Retorna cliente Supabase singleton (reutiliza conexão)"""
+    global _supabase_client
+    if _supabase_client is None:
+        _supabase_client = create_client(
+            os.getenv('SUPABASE_URL'),
+            os.getenv('SUPABASE_KEY')
+        )
+    return _supabase_client
+
 
 class SiengeSupabaseSync:
     """Sincroniza dados do Sienge para Supabase"""
     
     def __init__(self):
-        self.supabase = create_client(
-            os.getenv('SUPABASE_URL'),
-            os.getenv('SUPABASE_KEY')
-        )
+        self.supabase = get_supabase_client()
         self.sienge = sienge_client
     
     def sync_empreendimentos(self) -> dict:

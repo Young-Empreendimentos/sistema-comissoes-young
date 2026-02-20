@@ -1,14 +1,16 @@
+# ============================================================
+# Sistema de Comissões - Young Empreendimentos
+# Dependências Python
+# ============================================================
+
 # Flask e extensões
 Flask==3.0.0
 Werkzeug==3.0.1
 Flask-Login==0.6.3
-Flask-Cors==4.0.0
-
-# Supabase
+Flask-Cors==4.0.0# Servidor WSGI para produção
+gunicorn==21.2.0# Supabase
 supabase>=2.10.0
-websockets>=13.0
-
-# HTTP Requests (para API Sienge)
+websockets>=13.0# HTTP Requests (para API Sienge)
 requests==2.31.0
 
 # Variáveis de ambiente
