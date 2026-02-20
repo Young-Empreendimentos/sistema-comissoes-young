@@ -251,66 +251,109 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_itbi(self, building_id: int = None) -> dict:
-        """Sincroniza valores de ITBI - todas as empresas"""
+        """Sincroniza valores de ITBI - todas as empresas (busca detalhes de cada contrato)"""
         try:
-            # ITBI geralmente vem junto com os dados do contrato
+            # Buscar lista de contratos
             contracts = self.sienge.get_contracts_all_companies()
             count = 0
+            total = len(contracts)
             
-            for contract in contracts:
-                itbi_value = contract.get('itbiValue') or contract.get('taxValue')
-                if itbi_value:
-                    data = {
-                        'numero_contrato': contract.get('contractNumber'),
-                        'building_id': contract.get('buildingId'),
-                        'valor_itbi': itbi_value,
-                        'atualizado_em': datetime.now().isoformat()
-                    }
+            for idx, contract in enumerate(contracts, 1):
+                contract_id = contract.get('id')
+                if not contract_id:
+                    continue
+                
+                # Buscar detalhes do contrato para obter ITBI
+                try:
+                    details = self.sienge.get_contract_details(contract_id)
+                    if not details:
+                        continue
                     
-                    self.supabase.table('sienge_itbi').upsert(
-                        data,
-                        on_conflict='numero_contrato,building_id'
-                    ).execute()
-                    count += 1
+                    # ITBI pode estar em vários campos possíveis
+                    itbi_value = (
+                        details.get('itbiValue') or 
+                        details.get('taxValue') or 
+                        details.get('transferTaxValue') or
+                        0
+                    )
+                    
+                    if itbi_value and float(itbi_value) > 0:
+                        data = {
+                            'numero_contrato': details.get('number') or details.get('contractNumber'),
+                            'building_id': details.get('enterpriseId') or details.get('buildingId'),
+                            'valor_itbi': float(itbi_value),
+                            'atualizado_em': datetime.now().isoformat()
+                        }
+                        
+                        self.supabase.table('sienge_itbi').upsert(
+                            data,
+                            on_conflict='numero_contrato,building_id'
+                        ).execute()
+                        count += 1
+                        
+                except Exception as e:
+                    # Erro ao buscar detalhes, continuar com próximo
+                    pass
+                
+                # Progresso a cada 100 contratos
+                if idx % 100 == 0:
+                    print(f"[ITBI] Processados {idx}/{total} contratos, {count} com ITBI")
             
+            print(f"[ITBI] Concluído: {count} contratos com ITBI de {total} total")
             return {'sucesso': True, 'total': count}
         except Exception as e:
             print(f"Erro ao sincronizar ITBI: {str(e)}")
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_valores_pagos(self, building_id: int = None) -> dict:
-        """Sincroniza valores pagos dos contratos - usa paymentConditions na v1"""
+        """Sincroniza valores pagos dos contratos - busca detalhes de cada contrato para obter paymentConditions"""
         try:
-            # Na v1, os valores pagos vêm no campo paymentConditions do contrato
+            # Buscar lista de contratos
             contracts = self.sienge.get_contracts_all_companies()
             count = 0
+            total = len(contracts)
             
-            for contract in contracts:
-                # Calcular valor pago a partir de paymentConditions
-                payment_conditions = contract.get('paymentConditions') or []
-                valor_pago = sum(
-                    float(pc.get('amountPaid', 0) or 0)
-                    for pc in payment_conditions
-                )
+            for idx, contract in enumerate(contracts, 1):
+                contract_id = contract.get('id')
+                if not contract_id:
+                    continue
                 
-                if valor_pago > 0:
-                    data = {
-                        'numero_contrato': contract.get('number') or contract.get('contractNumber'),
-                        'building_id': contract.get('enterpriseId') or contract.get('buildingId'),
-                        'valor_pago': valor_pago,
-                        'atualizado_em': datetime.now().isoformat()
-                    }
+                # Buscar detalhes do contrato para obter paymentConditions
+                try:
+                    details = self.sienge.get_contract_details(contract_id)
+                    if not details:
+                        continue
                     
-                    try:
+                    # Calcular valor pago a partir de paymentConditions
+                    payment_conditions = details.get('paymentConditions') or []
+                    valor_pago = sum(
+                        float(pc.get('amountPaid', 0) or 0)
+                        for pc in payment_conditions
+                    )
+                    
+                    if valor_pago > 0:
+                        data = {
+                            'numero_contrato': details.get('number') or details.get('contractNumber'),
+                            'building_id': details.get('enterpriseId') or details.get('buildingId'),
+                            'valor_pago': valor_pago,
+                            'atualizado_em': datetime.now().isoformat()
+                        }
+                        
                         self.supabase.table('sienge_valor_pago').upsert(
                             data,
                             on_conflict='numero_contrato,building_id'
                         ).execute()
                         count += 1
-                    except Exception as e:
-                        # Tabela pode não existir, ignorar
-                        pass
+                        
+                except Exception as e:
+                    # Erro ao buscar detalhes, continuar com próximo
+                    pass
+                
+                # Progresso a cada 100 contratos
+                if idx % 100 == 0:
+                    print(f"[Valores Pagos] Processados {idx}/{total} contratos, {count} com valor pago")
             
+            print(f"[Valores Pagos] Concluído: {count} contratos com valor pago de {total} total")
             return {'sucesso': True, 'total': count}
         except Exception as e:
             print(f"Erro ao sincronizar valores pagos: {str(e)}")
