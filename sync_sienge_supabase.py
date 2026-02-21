@@ -12,32 +12,21 @@ from sienge_client import sienge_client
 
 load_dotenv()
 
-# Conexão global do Supabase (evita criar nova conexão a cada requisição)
-_supabase_client = None
-
-def get_supabase_client():
-    """Retorna cliente Supabase singleton (reutiliza conexão)"""
-    global _supabase_client
-    if _supabase_client is None:
-        _supabase_client = create_client(
-            os.getenv('SUPABASE_URL'),
-            os.getenv('SUPABASE_KEY')
-        )
-    return _supabase_client
-
 
 class SiengeSupabaseSync:
     """Sincroniza dados do Sienge para Supabase"""
     
     def __init__(self):
-        self.supabase = get_supabase_client()
+        self.supabase = create_client(
+            os.getenv('SUPABASE_URL'),
+            os.getenv('SUPABASE_KEY')
+        )
         self.sienge = sienge_client
     
     def sync_empreendimentos(self) -> dict:
-        """Sincroniza empreendimentos do Sienge (todas as empresas)"""
+        """Sincroniza empreendimentos do Sienge"""
         try:
-            # Buscar empreendimentos de TODAS as empresas
-            buildings = self.sienge.get_buildings_all_companies()
+            buildings = self.sienge.get_buildings()
             count = 0
             
             for building in buildings:
@@ -62,50 +51,31 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_contratos(self, building_id: int = None) -> dict:
-        """Sincroniza contratos do Sienge (ignora cancelados/distratados) - todas as empresas"""
+        """Sincroniza contratos do Sienge"""
         try:
-            # Buscar contratos de TODAS as empresas
-            contracts = self.sienge.get_contracts_all_companies()
+            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
             count = 0
-            cancelados = 0
             
             for contract in contracts:
-                # Na v1, campo mudou de 'status' para 'situation'
-                status = (contract.get('situation') or contract.get('status') or '').lower()
-                if any(x in status for x in ['cancel', 'distrat', 'rescind']):
-                    # Deletar do Supabase se existir
-                    try:
-                        self.supabase.table('sienge_contratos').delete()\
-                            .eq('sienge_id', contract.get('id')).execute()
-                        numero = contract.get('number') or contract.get('contractNumber')
-                        enterprise = contract.get('enterpriseId') or contract.get('buildingId')
-                        self.supabase.table('sienge_comissoes').delete()\
-                            .eq('numero_contrato', numero)\
-                            .eq('building_id', enterprise).execute()
-                    except:
-                        pass
-                    cancelados += 1
-                    continue
+                # Extrair nome do cliente
+                customers = contract.get('salesContractCustomers', [])
+                nome_cliente = customers[0].get('name') if customers else None
                 
-                # Extrair nome do cliente de salesContractCustomers (v1)
-                customers = contract.get('salesContractCustomers') or []
-                customer_name = customers[0].get('name') if customers else contract.get('customerName')
-                
-                # Extrair unidade de salesContractUnits (v1)
-                units = contract.get('salesContractUnits') or []
-                unit_name = units[0].get('name') if units else contract.get('unitName')
+                # Extrair unidade
+                units = contract.get('salesContractUnits', [])
+                unidade = units[0].get('name') if units else None
                 
                 data = {
                     'sienge_id': contract.get('id'),
-                    'numero_contrato': contract.get('number') or contract.get('contractNumber'),
-                    'building_id': contract.get('enterpriseId') or contract.get('buildingId'),
+                    'numero_contrato': contract.get('number'),
+                    'building_id': contract.get('enterpriseId'),
                     'company_id': contract.get('companyId'),
-                    'nome_cliente': customer_name,
+                    'nome_cliente': nome_cliente,
                     'data_contrato': contract.get('contractDate'),
-                    'valor_total': contract.get('totalSellingValue') or contract.get('value') or contract.get('totalValue'),
-                    'valor_a_vista': contract.get('value') or contract.get('totalSellingValue'),
-                    'status': contract.get('situation') or contract.get('status'),
-                    'unidade': unit_name,
+                    'valor_total': contract.get('value') or contract.get('totalSellingValue'),
+                    'valor_a_vista': contract.get('value'),
+                    'status': contract.get('situation'),
+                    'unidade': unidade,
                     'atualizado_em': datetime.now().isoformat()
                 }
                 
@@ -115,8 +85,8 @@ class SiengeSupabaseSync:
                 ).execute()
                 count += 1
             
-            print(f"[Sync] Contratos: {count} sincronizados, {cancelados} cancelados ignorados")
-            return {'sucesso': True, 'total': count, 'cancelados': cancelados}
+            print(f"[Contratos] Sincronizados: {count}")
+            return {'sucesso': True, 'total': count}
         except Exception as e:
             print(f"Erro ao sincronizar contratos: {str(e)}")
             return {'sucesso': False, 'erro': str(e)}
@@ -150,91 +120,26 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_comissoes(self, building_id: int = None) -> dict:
-        """Sincroniza comissões do Sienge (ignora cancelados) - todas as empresas"""
+        """Sincroniza comissões do Sienge"""
         try:
-            # Buscar comissões de TODAS as empresas
-            commissions = self.sienge.get_commissions_all_companies()
+            commissions = self.sienge.get_all_commissions_paginated(building_id=building_id)
             count = 0
-            cancelados = 0
-            
-            pagos = 0
             
             for commission in commissions:
-                # Na API v1, os campos usam ID maiúsculo: commissionID, enterpriseID, brokerID, etc
-                sienge_id = commission.get('commissionID') or commission.get('commissionId') or commission.get('id')
-                
-                # Verificar se a comissão está cancelada ou paga
-                status = (commission.get('installmentStatus') or commission.get('status') or '').upper()
-                cancelled_value = commission.get('cancelledValue') or 0
-                
-                # Ignorar comissões canceladas (por status ou por valor cancelado)
-                is_cancelled = 'CANCEL' in status or cancelled_value > 0
-                if is_cancelled:
-                    # Deletar do Supabase se existir
-                    try:
-                        if sienge_id:
-                            self.supabase.table('sienge_comissoes').delete()\
-                                .eq('sienge_id', sienge_id).execute()
-                    except:
-                        pass
-                    cancelados += 1
-                    continue
-                
-                # Pular se não tem ID válido
-                if not sienge_id:
-                    print(f"[Sync AVISO] Comissão sem ID válido: {commission.get('brokerName')} - {commission.get('salesContractNumber')}")
-                    continue
-                
-                # Comissões pagas são automaticamente marcadas como Aprovadas
-                release_value = commission.get('releaseValue') or 0
-                payment_bills = commission.get('paymentBills') or []
-                is_paga = 'PAID' in status or 'PAGO' in status or release_value > 0 or len(payment_bills) > 0
-                if is_paga:
-                    pagos += 1
-                
-                # Buscar status de aprovação existente (para não sobrescrever)
-                if is_paga:
-                    status_aprovacao = 'Aprovada'
-                else:
-                    status_aprovacao = 'Pendente'
-                    try:
-                        existing = self.supabase.table('sienge_comissoes')\
-                            .select('status_aprovacao')\
-                            .eq('sienge_id', sienge_id)\
-                            .limit(1).execute()
-                        if existing.data and existing.data[0].get('status_aprovacao'):
-                            status_aprovacao = existing.data[0]['status_aprovacao']
-                    except:
-                        pass
-                
-                # Valor da comissão - na v1 o campo é 'value'
-                valor_comissao = (
-                    commission.get('value') or 
-                    commission.get('commissionValue') or 
-                    commission.get('installmentValue') or 
-                    commission.get('totalValue') or
-                    0
-                )
-                
-                # Log para debug (apenas primeira comissão não cancelada)
-                if count == 0:
-                    print(f"[Sync DEBUG] Campos da comissão: {list(commission.keys())}")
-                    print(f"[Sync DEBUG] sienge_id={sienge_id}, valor={valor_comissao}")
-                
                 data = {
-                    'sienge_id': sienge_id,
-                    'numero_contrato': commission.get('salesContractNumber') or commission.get('contractNumber'),
-                    'building_id': commission.get('enterpriseID') or commission.get('enterpriseId') or commission.get('buildingId'),
+                    'sienge_id': commission.get('id'),
+                    'numero_contrato': commission.get('contractNumber'),
+                    'building_id': commission.get('buildingId'),
                     'company_id': commission.get('companyId'),
-                    'broker_id': commission.get('brokerID') or commission.get('brokerId'),
+                    'broker_id': commission.get('brokerId'),
                     'broker_nome': commission.get('brokerName'),
                     'customer_name': commission.get('customerName'),
                     'enterprise_name': commission.get('enterpriseName') or commission.get('buildingName'),
                     'unit_name': commission.get('unitName'),
-                    'commission_value': valor_comissao,
-                    'installment_status': commission.get('installmentStatus') or commission.get('status') or 'PENDING',
-                    'commission_date': commission.get('dueDate') or commission.get('contractDate'),
-                    'status_aprovacao': status_aprovacao,
+                    'commission_value': commission.get('commissionValue') or commission.get('value'),
+                    'installment_status': commission.get('installmentStatus') or commission.get('status'),
+                    'commission_date': commission.get('commissionDate') or commission.get('date'),
+                    'status_aprovacao': 'Pendente',
                     'atualizado_em': datetime.now().isoformat()
                 }
                 
@@ -244,139 +149,108 @@ class SiengeSupabaseSync:
                 ).execute()
                 count += 1
             
-            print(f"[Sync] Comissões: {count} sincronizadas, {cancelados} canceladas ignoradas, {pagos} pagas ignoradas")
-            return {'sucesso': True, 'total': count, 'cancelados': cancelados, 'pagos': pagos}
+            return {'sucesso': True, 'total': count}
         except Exception as e:
             print(f"Erro ao sincronizar comissões: {str(e)}")
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_itbi(self, building_id: int = None) -> dict:
-        """Sincroniza valores de ITBI - busca no endpoint /bills com documento PRV"""
+        """Sincroniza valores de ITBI extraindo do paymentConditions (conditionTypeId='DC')"""
         try:
-            # Buscar contratos que já estão no Supabase
-            result = self.supabase.table('sienge_contratos')\
-                .select('numero_contrato, building_id, company_id')\
-                .execute()
-            
-            contratos = result.data if result.data else []
+            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
             count = 0
-            total = len(contratos)
             erros = 0
             
-            # Verificar quais já têm ITBI no Supabase
-            result_itbi = self.supabase.table('sienge_itbi')\
-                .select('numero_contrato, building_id')\
-                .execute()
-            
-            itbi_existentes = set()
-            for item in (result_itbi.data or []):
-                chave = f"{item.get('numero_contrato')}_{item.get('building_id')}"
-                itbi_existentes.add(chave)
-            
-            print(f"[ITBI] {len(itbi_existentes)} contratos já possuem ITBI no Supabase")
-            
-            original_company_id = self.sienge.company_id
-            
-            for idx, contrato in enumerate(contratos, 1):
-                numero = contrato.get('numero_contrato')
-                bid = contrato.get('building_id')
-                company_id = contrato.get('company_id')
-                
-                if not numero:
-                    continue
-                
-                # Pular se já tem ITBI
-                chave = f"{numero}_{bid}"
-                if chave in itbi_existentes:
-                    continue
-                
-                # Buscar PRV com o número do contrato
+            for contract in contracts:
                 try:
-                    self.sienge.company_id = str(company_id) if company_id else original_company_id
-                    bill = self.sienge.get_bill_prv(str(numero))
+                    # Extrair ITBI do paymentConditions
+                    itbi_data = self.sienge.extract_itbi_from_contract(contract)
                     
-                    if bill:
-                        itbi_value = bill.get('totalInvoiceAmount') or 0
+                    if itbi_data and itbi_data.get('valor_itbi', 0) > 0:
+                        numero_contrato = contract.get('number')
+                        bid = contract.get('enterpriseId')
                         
-                        if itbi_value and float(itbi_value) > 0:
-                            data = {
-                                'numero_contrato': numero,
-                                'building_id': bid,
-                                'valor_itbi': float(itbi_value),
-                                'atualizado_em': datetime.now().isoformat()
-                            }
-                            
-                            self.supabase.table('sienge_itbi').upsert(
-                                data,
-                                on_conflict='numero_contrato,building_id'
-                            ).execute()
-                            count += 1
-                            print(f"[ITBI] Contrato {numero}: R$ {itbi_value}")
-                            
+                        data = {
+                            'numero_contrato': numero_contrato,
+                            'building_id': bid,
+                            'valor_itbi': itbi_data['valor_itbi'],
+                            'documento_sienge': itbi_data.get('documento'),
+                            'data_vencimento': itbi_data.get('data_vencimento'),
+                            'atualizado_em': datetime.now().isoformat()
+                        }
+                        
+                        # Verificar se já existe
+                        existe = self.supabase.table('sienge_itbi')\
+                            .select('id')\
+                            .eq('numero_contrato', numero_contrato)\
+                            .eq('building_id', bid)\
+                            .execute()
+                        
+                        if existe.data:
+                            self.supabase.table('sienge_itbi')\
+                                .update(data)\
+                                .eq('numero_contrato', numero_contrato)\
+                                .eq('building_id', bid)\
+                                .execute()
+                        else:
+                            self.supabase.table('sienge_itbi').insert(data).execute()
+                        
+                        count += 1
+                        print(f"[ITBI] Contrato {numero_contrato}: R$ {itbi_data['valor_itbi']:.2f}")
                 except Exception as e:
                     erros += 1
-                
-                # Progresso a cada 50 contratos
-                if idx % 50 == 0:
-                    print(f"[ITBI] Processados {idx}/{total} contratos, {count} com ITBI")
             
-            self.sienge.company_id = original_company_id
-            print(f"[ITBI] Concluído: {count} novos ITBI de {total} contratos ({erros} erros)")
+            print(f"[ITBI] Concluido: {count} ITBIs sincronizados ({erros} erros)")
             return {'sucesso': True, 'total': count, 'erros': erros}
         except Exception as e:
             print(f"Erro ao sincronizar ITBI: {str(e)}")
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_valores_pagos(self, building_id: int = None) -> dict:
-        """Sincroniza valores pagos dos contratos - busca detalhes de cada contrato para obter paymentConditions"""
+        """Sincroniza valores pagos dos contratos extraindo do paymentConditions"""
         try:
-            # Buscar lista de contratos
-            contracts = self.sienge.get_contracts_all_companies()
+            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
             count = 0
-            total = len(contracts)
+            erros = 0
             
-            for idx, contract in enumerate(contracts, 1):
-                contract_id = contract.get('id')
-                if not contract_id:
-                    continue
-                
-                # Buscar detalhes do contrato para obter paymentConditions
+            for contract in contracts:
                 try:
-                    details = self.sienge.get_contract_details(contract_id)
-                    if not details:
-                        continue
-                    
-                    # Calcular valor pago a partir de paymentConditions
-                    payment_conditions = details.get('paymentConditions') or []
-                    valor_pago = sum(
-                        float(pc.get('amountPaid', 0) or 0)
-                        for pc in payment_conditions
-                    )
+                    # Extrair valor pago do paymentConditions
+                    valor_pago = self.sienge.extract_valor_pago_from_contract(contract)
                     
                     if valor_pago > 0:
+                        numero_contrato = contract.get('number')
+                        bid = contract.get('enterpriseId')
+                        
                         data = {
-                            'numero_contrato': details.get('number') or details.get('contractNumber'),
-                            'building_id': details.get('enterpriseId') or details.get('buildingId'),
+                            'numero_contrato': numero_contrato,
+                            'building_id': bid,
                             'valor_pago': valor_pago,
                             'atualizado_em': datetime.now().isoformat()
                         }
                         
-                        self.supabase.table('sienge_valor_pago').upsert(
-                            data,
-                            on_conflict='numero_contrato,building_id'
-                        ).execute()
-                        count += 1
+                        # Verificar se já existe
+                        existe = self.supabase.table('sienge_valor_pago')\
+                            .select('id')\
+                            .eq('numero_contrato', numero_contrato)\
+                            .eq('building_id', bid)\
+                            .execute()
                         
+                        if existe.data:
+                            self.supabase.table('sienge_valor_pago')\
+                                .update(data)\
+                                .eq('numero_contrato', numero_contrato)\
+                                .eq('building_id', bid)\
+                                .execute()
+                        else:
+                            self.supabase.table('sienge_valor_pago').insert(data).execute()
+                        
+                        count += 1
                 except Exception as e:
-                    # Erro ao buscar detalhes, continuar com próximo
-                    pass
-                
-                # Progresso a cada 100 contratos
-                if idx % 100 == 0:
-                    print(f"[Valores Pagos] Processados {idx}/{total} contratos, {count} com valor pago")
+                    erros += 1
             
-            print(f"[Valores Pagos] Concluído: {count} contratos com valor pago de {total} total")
-            return {'sucesso': True, 'total': count}
+            print(f"[Valor Pago] Concluido: {count} valores sincronizados ({erros} erros)")
+            return {'sucesso': True, 'total': count, 'erros': erros}
         except Exception as e:
             print(f"Erro ao sincronizar valores pagos: {str(e)}")
             return {'sucesso': False, 'erro': str(e)}
@@ -495,7 +369,7 @@ class SiengeSupabaseSync:
             return []
     
     def get_contratos_por_empreendimento(self, building_id: int) -> List[Dict]:
-        """Retorna contratos de um empreendimento da tabela sienge_contratos (exclui cancelados)"""
+        """Retorna contratos de um empreendimento da tabela sienge_contratos"""
         try:
             result = self.supabase.table('sienge_contratos')\
                 .select('*')\
@@ -504,39 +378,14 @@ class SiengeSupabaseSync:
                 .execute()
             data = result.data if result.data else []
             
-            # Buscar comissões para identificar contratos cancelados
-            result_comissoes = self.supabase.table('sienge_comissoes')\
-                .select('numero_contrato, installment_status')\
-                .eq('building_id', building_id)\
-                .execute()
-            
-            # Agrupar comissões por contrato e verificar se todas estão canceladas
-            contratos_cancelados = set()
-            contratos_comissoes = {}
-            for c in (result_comissoes.data or []):
-                nc = c.get('numero_contrato')
-                if nc not in contratos_comissoes:
-                    contratos_comissoes[nc] = []
-                contratos_comissoes[nc].append(c.get('installment_status') or '')
-            
-            for nc, statuses in contratos_comissoes.items():
-                # Contrato cancelado se TODAS as comissões estão canceladas
-                if statuses and all('CANCEL' in s.upper() for s in statuses):
-                    contratos_cancelados.add(nc)
-            
-            # Filtrar contratos cancelados
-            data_filtrada = []
+            # Mapear campos para o formato esperado pelo frontend
             for c in data:
-                nc = c.get('numero_contrato')
-                if nc in contratos_cancelados:
-                    continue
                 # Mapear unidades -> unidade
                 if 'unidades' in c and 'unidade' not in c:
                     c['unidade'] = c.get('unidades')
-                data_filtrada.append(c)
             
-            print(f"[Sync] get_contratos_por_empreendimento({building_id}): {len(data_filtrada)} registros (excluídos {len(contratos_cancelados)} cancelados)")
-            return data_filtrada
+            print(f"[Sync] get_contratos_por_empreendimento({building_id}): {len(data)} registros")
+            return data
         except Exception as e:
             print(f"[Sync] Erro ao buscar contratos: {str(e)}")
             return []
@@ -655,10 +504,8 @@ class SiengeSupabaseSync:
             return None
     
     def buscar_contratos_por_lote(self, numero_lote: str) -> List[Dict]:
-        """Busca contratos que contenham o numero do lote na tabela sienge_contratos"""
-        import json
+        """Busca contratos por numero do lote, contrato ou nome do cliente"""
         
-        # Mapeamento de building_id para nome do empreendimento (strings e inteiros)
         EMPREENDIMENTOS = {
             '2003': 'Montecarlo',
             '2004': 'Ilha dos Açores',
@@ -678,89 +525,19 @@ class SiengeSupabaseSync:
             2014: 'Morada da Coxilha'
         }
         
-        def extrair_numero_lote(unidades_data):
-            """Extrai numeros de lote do campo unidades (pode ser jsonb)"""
-            if not unidades_data:
-                return []
-            
-            if isinstance(unidades_data, list):
-                # Ja e uma lista de objetos
-                return [str(u.get('name', '')) for u in unidades_data if isinstance(u, dict)]
-            elif isinstance(unidades_data, str):
-                try:
-                    parsed = json.loads(unidades_data)
-                    if isinstance(parsed, list):
-                        return [str(u.get('name', '')) for u in parsed if isinstance(u, dict)]
-                except:
-                    return [unidades_data]
-            return [str(unidades_data)]
-        
         try:
-            # Buscar por numero_contrato ou nome_cliente (campos texto)
+            # Busca unificada: numero_contrato, nome_cliente e unidades (JSONB cast to text)
             result = self.supabase.table('sienge_contratos')\
                 .select('*')\
-                .or_(f'numero_contrato.ilike.%{numero_lote}%,nome_cliente.ilike.%{numero_lote}%')\
-                .limit(100)\
+                .or_(f'numero_contrato.ilike.%{numero_lote}%,nome_cliente.ilike.%{numero_lote}%,unidades::text.ilike.%{numero_lote}%')\
+                .limit(50)\
                 .execute()
             
-            contratos_texto = result.data if result.data else []
+            contratos = result.data if result.data else []
             
-            # Tambem buscar todos e filtrar pelo campo unidades em Python
-            result_all = self.supabase.table('sienge_contratos')\
-                .select('*')\
-                .limit(2000)\
-                .execute()
-            
-            contratos_por_unidade = []
-            if result_all.data:
-                for c in result_all.data:
-                    lotes = extrair_numero_lote(c.get('unidades'))
-                    # Verificar se algum lote contem o termo buscado
-                    if any(numero_lote.lower() in lote.lower() for lote in lotes):
-                        contratos_por_unidade.append(c)
-            
-            # Buscar comissões para identificar contratos cancelados
-            result_comissoes = self.supabase.table('sienge_comissoes')\
-                .select('numero_contrato, building_id, installment_status')\
-                .execute()
-            
-            # Agrupar comissões por contrato e verificar se todas estão canceladas
-            contratos_cancelados = set()
-            contratos_comissoes = {}
-            for c in (result_comissoes.data or []):
-                chave = f"{c.get('numero_contrato')}_{c.get('building_id')}"
-                if chave not in contratos_comissoes:
-                    contratos_comissoes[chave] = []
-                contratos_comissoes[chave].append(c.get('installment_status') or '')
-            
-            for chave, statuses in contratos_comissoes.items():
-                if statuses and all('CANCEL' in s.upper() for s in statuses):
-                    contratos_cancelados.add(chave)
-            
-            # Combinar resultados sem duplicatas e filtrar cancelados
-            contratos_ids = set()
-            contratos = []
-            
-            for c in contratos_texto + contratos_por_unidade:
-                # Filtrar cancelados (baseado nas comissões)
-                chave = f"{c.get('numero_contrato')}_{c.get('building_id')}"
-                if chave in contratos_cancelados:
-                    continue
-                    
-                cid = c.get('sienge_id') or c.get('id') or c.get('numero_contrato')
-                if cid not in contratos_ids:
-                    contratos_ids.add(cid)
-                    contratos.append(c)
-            
-            # Limitar a 50 resultados
-            contratos = contratos[:50]
-            
-            # Mapear campos para o formato esperado pelo frontend
             for c in contratos:
-                # Mapear unidades -> unidade
                 if 'unidades' in c and 'unidade' not in c:
                     c['unidade'] = c.get('unidades')
-                # Adicionar nome do empreendimento
                 bid = c.get('building_id')
                 c['sienge_empreendimentos'] = {'nome': EMPREENDIMENTOS.get(bid, f'Empreendimento {bid}')}
             

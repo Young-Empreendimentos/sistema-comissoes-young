@@ -74,17 +74,8 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 auth_manager = AuthManager()
 
 
-# Função para calcular o valor do gatilho
+# Função para calcular o valor do gatilho a partir da string de regra
 def calcular_valor_gatilho(valor_a_vista: float, valor_itbi: float, regra: str) -> float:
-    """
-    Calcula o valor do gatilho baseado na regra de comissão.
-    
-    Regras suportadas:
-    - '10% + ITBI': 10% do valor à vista + ITBI
-    - '10%': 10% do valor à vista
-    - '5%': 5% do valor à vista
-    - '6%': 6% do valor à vista
-    """
     if not regra:
         regra = '10% + ITBI'
     
@@ -99,16 +90,155 @@ def calcular_valor_gatilho(valor_a_vista: float, valor_itbi: float, regra: str) 
     elif '6%' in regra_lower:
         return valor_a_vista * 0.06
     else:
-        # Tentar extrair percentual da string
         match = re.search(r'(\d+[,.]?\d*)\s*%', regra)
         if match:
             percentual = float(match.group(1).replace(',', '.')) / 100
             if 'itbi' in regra_lower:
                 return (valor_a_vista * percentual) + valor_itbi
             return valor_a_vista * percentual
-        
-        # Padrão: 10% + ITBI
         return (valor_a_vista * 0.10) + valor_itbi
+
+
+def obter_gatilho_contrato(sync, numero_contrato, building_id, comissao_record=None):
+    """
+    Função centralizada que calcula o gatilho de um contrato.
+    Garante consistência entre todas as telas (consulta por contrato, visualizar comissões, etc.)
+    
+    Retorna dict com: valor_gatilho, atingiu_gatilho, valor_pago, regra_gatilho, valor_a_vista, valor_itbi
+    """
+    resultado = {
+        'valor_gatilho': 0,
+        'atingiu_gatilho': False,
+        'valor_pago': 0,
+        'regra_gatilho': '10% + ITBI',
+        'valor_a_vista': 0,
+        'valor_itbi': 0
+    }
+    
+    if not numero_contrato or not building_id:
+        return resultado
+    
+    # Normalizar building_id para garantir consistência nas buscas
+    building_id_str = str(building_id)
+    numero_contrato_str = str(numero_contrato)
+    
+    print(f"[obter_gatilho] Contrato: {numero_contrato_str}, Building: {building_id}")
+    
+    try:
+        # 1. Buscar contrato para pegar valor_a_vista
+        contrato = sync.get_contrato_por_numero(numero_contrato_str, building_id)
+        if not contrato:
+            # Tentar com building_id como int
+            try:
+                contrato = sync.get_contrato_por_numero(numero_contrato_str, int(building_id_str))
+            except (ValueError, TypeError):
+                pass
+        
+        valor_a_vista = 0
+        if contrato:
+            valor_a_vista = float(contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)
+        
+        # 2. Buscar ITBI
+        valor_itbi = sync.get_itbi_por_contrato(numero_contrato_str, building_id) or 0
+        if not valor_itbi:
+            try:
+                valor_itbi = sync.get_itbi_por_contrato(numero_contrato_str, int(building_id_str)) or 0
+            except (ValueError, TypeError):
+                pass
+        
+        # 3. Buscar valor pago
+        valor_pago = sync.get_valor_pago_por_contrato(numero_contrato_str, building_id) or 0
+        if not valor_pago:
+            try:
+                valor_pago = sync.get_valor_pago_por_contrato(numero_contrato_str, int(building_id_str)) or 0
+            except (ValueError, TypeError):
+                pass
+        
+        # 4. Determinar a regra do gatilho
+        # Prioridade: regra_gatilho_id -> regras_gatilho table (dados estruturados)
+        #             regra_gatilho text field (campo texto legacy)
+        #             Default: 10% + ITBI
+        regra_gatilho_texto = '10% + ITBI'
+        percentual = None
+        inclui_itbi = None
+        
+        # Se temos o registro da comissão, usar dele
+        if not comissao_record:
+            try:
+                comissao_result = sync.supabase.table('sienge_comissoes')\
+                    .select('regra_gatilho, regra_gatilho_id')\
+                    .eq('numero_contrato', numero_contrato_str)\
+                    .eq('building_id', building_id)\
+                    .limit(1)\
+                    .execute()
+                if comissao_result.data:
+                    comissao_record = comissao_result.data[0]
+            except Exception:
+                pass
+        
+        if comissao_record:
+            # Tentar buscar a regra estruturada pela regra_gatilho_id
+            regra_id = comissao_record.get('regra_gatilho_id')
+            if regra_id:
+                try:
+                    regra_result = sync.supabase.table('regras_gatilho')\
+                        .select('percentual, inclui_itbi, nome, tipo_regra')\
+                        .eq('id', regra_id)\
+                        .limit(1)\
+                        .execute()
+                    if regra_result.data:
+                        regra_data = regra_result.data[0]
+                        percentual = regra_data.get('percentual')
+                        inclui_itbi = regra_data.get('inclui_itbi')
+                        nome = regra_data.get('nome', '')
+                        tipo_regra = regra_data.get('tipo_regra', 'gatilho')
+                        
+                        if percentual is not None:
+                            if inclui_itbi:
+                                regra_gatilho_texto = f"{percentual}% + ITBI"
+                            else:
+                                regra_gatilho_texto = f"{percentual}%"
+                except Exception as e:
+                    print(f"[obter_gatilho] Erro ao buscar regra {regra_id}: {str(e)}")
+            
+            # Se não encontrou pela ID, usar o campo texto
+            if percentual is None:
+                regra_texto = comissao_record.get('regra_gatilho')
+                if regra_texto:
+                    regra_gatilho_texto = regra_texto
+        
+        # 5. Calcular valor do gatilho
+        if percentual is not None:
+            # Usar dados estruturados (mais confiável)
+            perc = float(percentual) / 100.0
+            if inclui_itbi:
+                valor_gatilho = (valor_a_vista * perc) + float(valor_itbi)
+            else:
+                valor_gatilho = valor_a_vista * perc
+        else:
+            # Fallback: usar a função de parse de texto
+            valor_gatilho = calcular_valor_gatilho(valor_a_vista, float(valor_itbi), regra_gatilho_texto)
+        
+        # 6. Verificar se atingiu (valor pago >= valor gatilho)
+        atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+        
+        resultado = {
+            'valor_gatilho': valor_gatilho,
+            'atingiu_gatilho': atingiu_gatilho,
+            'valor_pago': float(valor_pago),
+            'regra_gatilho': regra_gatilho_texto,
+            'valor_a_vista': valor_a_vista,
+            'valor_itbi': float(valor_itbi)
+        }
+        
+        print(f"[obter_gatilho] Resultado: valor_a_vista={valor_a_vista}, valor_itbi={valor_itbi}, valor_pago={valor_pago}")
+        print(f"[obter_gatilho] Regra: {regra_gatilho_texto}, percentual={percentual}, inclui_itbi={inclui_itbi}")
+        print(f"[obter_gatilho] valor_gatilho={valor_gatilho}, atingiu={atingiu_gatilho}")
+        
+    except Exception as e:
+        print(f"[obter_gatilho] Erro para contrato {numero_contrato}/{building_id}: {str(e)}")
+    
+    return resultado
 
 
 # ==================== FLASK-LOGIN CALLBACKS ====================
@@ -295,6 +425,7 @@ def get_contrato_info():
         corretor_principal = contrato.get('corretor') or contrato.get('broker_nome') or contrato.get('broker_name')
         valor_comissao = None
         status_parcela = None
+        comissao_record = None
         
         # 3. Buscar comissao da tabela sienge_comissoes
         try:
@@ -306,13 +437,11 @@ def get_contrato_info():
                 .execute()
             
             if comissao_result.data:
-                comissao = comissao_result.data[0]
-                # Tentar diferentes nomes de colunas para corretor (se nao veio do contrato)
+                comissao_record = comissao_result.data[0]
                 if not corretor_principal:
-                    corretor_principal = comissao.get('broker_nome') or comissao.get('broker_name') or comissao.get('corretor')
-                # Valor da comissao
-                valor_comissao = comissao.get('commission_value') or comissao.get('valor_comissao') or comissao.get('value')
-                status_parcela = comissao.get('installment_status') or comissao.get('status') or comissao.get('status_parcela')
+                    corretor_principal = comissao_record.get('broker_nome') or comissao_record.get('broker_name') or comissao_record.get('corretor')
+                valor_comissao = comissao_record.get('commission_value') or comissao_record.get('valor_comissao') or comissao_record.get('value')
+                status_parcela = comissao_record.get('installment_status') or comissao_record.get('status') or comissao_record.get('status_parcela')
                 print(f"[API] Comissao encontrada: corretor={corretor_principal}, valor={valor_comissao}")
         except Exception as e:
             print(f"[API] Erro ao buscar comissao (ignorando): {str(e)}")
@@ -346,39 +475,11 @@ def get_contrato_info():
         
         print(f"[API] Dados finais: corretor={corretor_principal}, comissao={valor_comissao}")
         
-        # 5. Buscar ITBI
-        valor_itbi = sync.get_itbi_por_contrato(numero_contrato, building_id) or 0
-        
-        # 6. Buscar valor pago
-        valor_pago = sync.get_valor_pago_por_contrato(numero_contrato, building_id) or 0
-        
         # Traduzir status
         status_parcela_traduzido = traduzir_status(status_parcela) if status_parcela else None
         
-        # 7. Calcular gatilho
-        regra_gatilho = '10% + ITBI'
-        valor_a_vista_calc = float(contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)
-        valor_itbi_calc = float(valor_itbi or 0)
-        valor_pago_calc = float(valor_pago or 0)
-        
-        # Buscar regra específica (usando a mesma consulta anterior se possível)
-        try:
-            gatilho_result = sync.supabase.table('sienge_comissoes')\
-                .select('*')\
-                .eq('numero_contrato', numero_contrato)\
-                .eq('building_id', building_id)\
-                .limit(1)\
-                .execute()
-            
-            if gatilho_result.data:
-                regra = gatilho_result.data[0].get('regra_gatilho')
-                if regra:
-                    regra_gatilho = regra
-        except Exception as e:
-            print(f"[API] Erro ao buscar regra gatilho (ignorando): {str(e)}")
-        
-        valor_gatilho = calcular_valor_gatilho(valor_a_vista_calc, valor_itbi_calc, regra_gatilho)
-        atingiu_gatilho = valor_pago_calc >= valor_gatilho if valor_gatilho > 0 else False
+        # Calcular gatilho usando função centralizada
+        gatilho = obter_gatilho_contrato(sync, numero_contrato, building_id, comissao_record)
         
         # Mapeamento de building_id para nome do empreendimento
         EMPREENDIMENTOS = {
@@ -411,14 +512,14 @@ def get_contrato_info():
             'corretor_principal': corretor_principal,
             'valor_comissao': valor_comissao,
             'status_parcela': status_parcela_traduzido,
-            'valor_itbi': valor_itbi,
-            'valor_pago': valor_pago,
+            'valor_itbi': gatilho['valor_itbi'],
+            'valor_pago': gatilho['valor_pago'],
             'building_id': building_id,
             'empreendimento_nome': empreendimento_nome,
             'company_id': contrato.get('company_id'),
-            'regra_gatilho': regra_gatilho,
-            'valor_gatilho': valor_gatilho,
-            'atingiu_gatilho': atingiu_gatilho
+            'regra_gatilho': gatilho['regra_gatilho'],
+            'valor_gatilho': gatilho['valor_gatilho'],
+            'atingiu_gatilho': gatilho['atingiu_gatilho']
         }
         
         return jsonify(info), 200
@@ -583,6 +684,109 @@ def ultima_sincronizacao():
         return jsonify(ultima), 200
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
+
+
+@app.route('/api/sincronizar-itbi-faltantes', methods=['POST'])
+@login_required
+def sincronizar_itbi_faltantes():
+    """Sincroniza ITBIs apenas para contratos que não possuem ITBI ainda"""
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Apenas administradores podem executar esta ação'}), 403
+    
+    try:
+        sync = SiengeSupabaseSync()
+        resultado = sync.sync_itbi_faltantes()
+        
+        return jsonify({
+            'sucesso': resultado.get('sucesso', False),
+            'mensagem': f"Sincronização de ITBI concluída! {resultado.get('total', 0)} novos ITBIs encontrados.",
+            'resultado': resultado
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        print(f"[ERRO ITBI] {str(e)}")
+        traceback.print_exc()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
+@app.route('/api/contratos-sem-itbi', methods=['GET'])
+@login_required
+def listar_contratos_sem_itbi():
+    """Lista contratos que não possuem ITBI cadastrado"""
+    try:
+        sync = SiengeSupabaseSync()
+        
+        # Buscar todos os contratos
+        contratos_result = sync.supabase.table('sienge_contratos')\
+            .select('numero_contrato, building_id, nome_cliente, unidade, data_contrato, company_id')\
+            .execute()
+        
+        contratos = contratos_result.data if contratos_result.data else []
+        
+        # Buscar ITBIs existentes
+        itbi_result = sync.supabase.table('sienge_itbi')\
+            .select('numero_contrato, building_id')\
+            .execute()
+        
+        # Criar set de contratos que já têm ITBI
+        itbi_existentes = set()
+        for item in (itbi_result.data or []):
+            chave = f"{item.get('numero_contrato')}_{item.get('building_id')}"
+            itbi_existentes.add(chave)
+        
+        # Mapeamento de building_id para nome do empreendimento
+        EMPREENDIMENTOS = {
+            '2003': 'Montecarlo',
+            '2004': 'Ilha dos Açores',
+            '2005': 'Aurora',
+            '2007': 'Parque Lorena I',
+            '2009': 'Parque Lorena II',
+            '2010': 'Erico Verissimo',
+            '2011': 'Algarve',
+            '2014': 'Morada da Coxilha',
+            2003: 'Montecarlo',
+            2004: 'Ilha dos Açores',
+            2005: 'Aurora',
+            2007: 'Parque Lorena I',
+            2009: 'Parque Lorena II',
+            2010: 'Erico Verissimo',
+            2011: 'Algarve',
+            2014: 'Morada da Coxilha'
+        }
+        
+        # Filtrar contratos sem ITBI
+        contratos_sem_itbi = []
+        for c in contratos:
+            chave = f"{c.get('numero_contrato')}_{c.get('building_id')}"
+            if chave not in itbi_existentes:
+                bid = c.get('building_id')
+                contratos_sem_itbi.append({
+                    'numero_contrato': c.get('numero_contrato'),
+                    'building_id': bid,
+                    'empreendimento': EMPREENDIMENTOS.get(bid, f'Empreendimento {bid}'),
+                    'nome_cliente': c.get('nome_cliente'),
+                    'unidade': c.get('unidade'),
+                    'data_contrato': c.get('data_contrato'),
+                    'company_id': c.get('company_id')
+                })
+        
+        # Ordenar por empreendimento e número do contrato
+        contratos_sem_itbi.sort(key=lambda x: (x.get('empreendimento', ''), str(x.get('numero_contrato', ''))))
+        
+        return jsonify({
+            'sucesso': True,
+            'contratos': contratos_sem_itbi,
+            'total': len(contratos_sem_itbi),
+            'total_com_itbi': len(itbi_existentes),
+            'total_contratos': len(contratos)
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        print(f"[ERRO] Erro ao listar contratos sem ITBI: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 
 @app.route('/api/limpar-cancelados', methods=['POST'])
@@ -913,6 +1117,85 @@ def excluir_regra_gatilho(regra_id):
         return jsonify({'status': 'erro', 'mensagem': str(e)}), 500
 
 
+# ==================== API - ATUALIZAR REGRA DE COMISSÃO ====================
+
+@app.route('/api/comissoes/<int:comissao_id>/regra', methods=['PUT'])
+@login_required
+def atualizar_regra_comissao(comissao_id):
+    """Atualiza a regra de gatilho de uma comissão específica e recalcula os valores"""
+    try:
+        data = request.get_json()
+        regra_gatilho_id = data.get('regra_gatilho_id')
+        
+        sync = SiengeSupabaseSync()
+        
+        # Buscar a comissão atual
+        comissao_result = sync.supabase.table('sienge_comissoes')\
+            .select('*')\
+            .eq('id', comissao_id)\
+            .limit(1)\
+            .execute()
+        
+        if not comissao_result.data:
+            return jsonify({'sucesso': False, 'erro': 'Comissão não encontrada'}), 404
+        
+        comissao = comissao_result.data[0]
+        
+        # Atualizar o regra_gatilho_id no banco
+        update_data = {
+            'regra_gatilho_id': regra_gatilho_id if regra_gatilho_id else None,
+            'atualizado_em': datetime.now().isoformat()
+        }
+        
+        # Se selecionou uma regra, buscar e atualizar também o campo texto para compatibilidade
+        if regra_gatilho_id:
+            regra_result = sync.supabase.table('regras_gatilho')\
+                .select('percentual, inclui_itbi, nome')\
+                .eq('id', regra_gatilho_id)\
+                .limit(1)\
+                .execute()
+            
+            if regra_result.data:
+                regra = regra_result.data[0]
+                percentual = regra.get('percentual')
+                inclui_itbi = regra.get('inclui_itbi')
+                if percentual is not None:
+                    if inclui_itbi:
+                        update_data['regra_gatilho'] = f"{percentual}% + ITBI"
+                    else:
+                        update_data['regra_gatilho'] = f"{percentual}%"
+        else:
+            update_data['regra_gatilho'] = '10% + ITBI'
+        
+        sync.supabase.table('sienge_comissoes')\
+            .update(update_data)\
+            .eq('id', comissao_id)\
+            .execute()
+        
+        # Recalcular o gatilho com a nova regra
+        comissao['regra_gatilho_id'] = regra_gatilho_id
+        comissao['regra_gatilho'] = update_data.get('regra_gatilho', '10% + ITBI')
+        
+        gatilho = obter_gatilho_contrato(
+            sync, 
+            comissao.get('numero_contrato'), 
+            comissao.get('building_id'), 
+            comissao
+        )
+        
+        return jsonify({
+            'sucesso': True,
+            'valor_gatilho': gatilho['valor_gatilho'],
+            'atingiu_gatilho': gatilho['atingiu_gatilho'],
+            'regra_gatilho': gatilho['regra_gatilho'],
+            'valor_pago': gatilho['valor_pago']
+        }), 200
+        
+    except Exception as e:
+        print(f"[API] Erro ao atualizar regra da comissão {comissao_id}: {str(e)}")
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
 # ==================== API - RELATÓRIO DE COMISSÕES ====================
 
 @app.route('/api/relatorio-comissoes', methods=['GET'])
@@ -1160,46 +1443,26 @@ def listar_todas_comissoes():
     try:
         sync = SiengeSupabaseSync()
         
-        # Obter parâmetros de filtro (agora suportam múltiplos valores separados por vírgula)
         status_parcela_param = request.args.get('status_parcela', '')
         status_aprovacao_param = request.args.get('status_aprovacao', '')
         gatilho_atingido_param = request.args.get('gatilho_atingido', '')
         data_inicio = request.args.get('data_inicio', '')
         data_fim = request.args.get('data_fim', '')
         
-        # Converter para listas (split por vírgula)
         status_parcela_list = [s.strip() for s in status_parcela_param.split(',') if s.strip()]
         status_aprovacao_list = [s.strip() for s in status_aprovacao_param.split(',') if s.strip()]
         gatilho_list = [s.strip() for s in gatilho_atingido_param.split(',') if s.strip()]
         
-        print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, data_inicio: {data_inicio}, data_fim: {data_fim}")
+        print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}")
         
-        # Buscar todas as comissões
-        query = sync.supabase.table('sienge_comissoes').select('*')
-        
-        result = query.execute()
+        # Buscar comissões
+        result = sync.supabase.table('sienge_comissoes').select('*').execute()
         comissoes = result.data if result.data else []
         
-        # FILTRAR CANCELADOS - Remover comissões com installment_status CANCELLED (pagas devem aparecer)
         comissoes = [c for c in comissoes 
                      if 'CANCEL' not in (c.get('installment_status') or '').upper()]
         
-        # Log dos status unicos para debug
-        status_unicos = set()
-        for c in comissoes:
-            st = c.get('installment_status')
-            if st:
-                status_unicos.add(st)
-        print(f"[API] Status de parcela encontrados: {sorted(status_unicos)}")
-        
-        # DEBUG: Verificar valores de comissão e todos os campos disponíveis
-        if comissoes:
-            exemplo = comissoes[0]
-            print(f"[DEBUG] Exemplo comissão - valor_comissao: {exemplo.get('valor_comissao')}, commission_value: {exemplo.get('commission_value')}")
-            print(f"[DEBUG] Campos com valor: installment_percentage={exemplo.get('installment_percentage')}, contract_percentage_paid={exemplo.get('contract_percentage_paid')}")
-        
-        # Aplicar filtros em Python (mais flexível)
-        # Mapeamento de status PT-BR para valores em inglês
+        # Mapeamento de status PT-BR -> EN
         mapa_status_parcela = {
             'pago': ['paidout', 'paid out', 'paid', 'pago'],
             'pendente': ['pending', 'pendente'],
@@ -1211,7 +1474,6 @@ def listar_todas_comissoes():
             'liberado': ['released', 'liberado']
         }
         
-        # Filtro de status da parcela (multi-select)
         if status_parcela_list:
             def match_status_parcela(comissao):
                 status_comissao = (comissao.get('installment_status') or '').lower()
@@ -1223,55 +1485,89 @@ def listar_todas_comissoes():
                 return False
             comissoes = [c for c in comissoes if match_status_parcela(c)]
         
-        # Filtro de status de aprovação (multi-select)
         if status_aprovacao_list:
             comissoes = [c for c in comissoes if c.get('status_aprovacao') in status_aprovacao_list]
         
-        # Filtro de gatilho atingido (multi-select)
-        if gatilho_list:
-            gatilho_bools = [g.lower() == 'true' for g in gatilho_list]
-            comissoes = [c for c in comissoes if c.get('atingiu_gatilho') in gatilho_bools]
-        
-        # Ordenar por data
         comissoes.sort(key=lambda x: x.get('commission_date') or '', reverse=True)
         
-        # Buscar todos os valores pagos de uma vez só (otimizado)
-        try:
-            valores_pagos_result = sync.supabase.table('sienge_valor_pago').select('numero_contrato, building_id, valor_pago').execute()
-            # Criar dicionário para lookup rápido: chave = "numero_contrato|building_id"
-            valores_pagos_map = {}
-            if valores_pagos_result.data:
-                for vp in valores_pagos_result.data:
-                    chave = f"{vp.get('numero_contrato')}|{vp.get('building_id')}"
-                    valores_pagos_map[chave] = vp.get('valor_pago', 0)
-            
-            # Adicionar valor_pago a cada comissão usando o dicionário
-            for c in comissoes:
-                chave = f"{c.get('numero_contrato')}|{c.get('building_id')}"
-                c['valor_pago'] = valores_pagos_map.get(chave, 0)
-        except Exception as e:
-            print(f"Erro ao buscar valores pagos: {e}")
-            for c in comissoes:
-                c['valor_pago'] = 0
+        # ===== BATCH LOADING: carregar todos os dados auxiliares de uma vez =====
+        # Em vez de N queries por comissão, fazemos apenas 4 queries no total
+        print(f"[API] Batch-loading dados para {len(comissoes)} comissões...")
         
-        # Buscar data_contrato da tabela sienge_contratos
-        try:
-            contratos_result = sync.supabase.table('sienge_contratos').select('numero_contrato, building_id, data_contrato').execute()
-            # Criar dicionário para lookup rápido
-            data_contrato_map = {}
-            if contratos_result.data:
-                for ct in contratos_result.data:
-                    chave = f"{ct.get('numero_contrato')}|{ct.get('building_id')}"
-                    data_contrato_map[chave] = ct.get('data_contrato')
+        # 1. Carregar todos os contratos
+        contratos_result = sync.supabase.table('sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total,data_contrato').execute()
+        contratos_map = {}
+        for ct in (contratos_result.data or []):
+            key = (str(ct.get('numero_contrato', '')), str(ct.get('building_id', '')))
+            contratos_map[key] = ct
+        
+        # 2. Carregar todos os ITBIs
+        itbi_result = sync.supabase.table('sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
+        itbi_map = {}
+        for it in (itbi_result.data or []):
+            key = (str(it.get('numero_contrato', '')), str(it.get('building_id', '')))
+            itbi_map[key] = float(it.get('valor_itbi') or 0)
+        
+        # 3. Carregar todos os valores pagos
+        pago_result = sync.supabase.table('sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
+        pago_map = {}
+        for pg in (pago_result.data or []):
+            key = (str(pg.get('numero_contrato', '')), str(pg.get('building_id', '')))
+            pago_map[key] = float(pg.get('valor_pago') or 0)
+        
+        # 4. Carregar todas as regras de gatilho
+        regras_result = sync.supabase.table('regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
+        regras_map = {}
+        for rg in (regras_result.data or []):
+            regras_map[rg['id']] = rg
+        
+        print(f"[API] Batch-load concluído: {len(contratos_map)} contratos, {len(itbi_map)} ITBIs, {len(pago_map)} pagos, {len(regras_map)} regras")
+        
+        # ===== Calcular gatilho para cada comissão usando dados pré-carregados =====
+        for c in comissoes:
+            numero_contrato = str(c.get('numero_contrato') or '')
+            building_id = str(c.get('building_id') or '')
+            key = (numero_contrato, building_id)
             
-            # Adicionar data_contrato a cada comissão
-            for c in comissoes:
-                chave = f"{c.get('numero_contrato')}|{c.get('building_id')}"
-                c['data_contrato'] = data_contrato_map.get(chave)
-        except Exception as e:
-            print(f"Erro ao buscar data_contrato: {e}")
-            for c in comissoes:
-                c['data_contrato'] = None
+            contrato = contratos_map.get(key)
+            valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
+            valor_itbi = itbi_map.get(key, 0)
+            valor_pago = pago_map.get(key, 0)
+            c['data_contrato'] = contrato.get('data_contrato') if contrato else None
+            
+            # Determinar regra do gatilho
+            regra_gatilho_texto = '10% + ITBI'
+            percentual = None
+            inclui_itbi = None
+            
+            regra_id = c.get('regra_gatilho_id')
+            if regra_id and regra_id in regras_map:
+                regra_data = regras_map[regra_id]
+                percentual = regra_data.get('percentual')
+                inclui_itbi = regra_data.get('inclui_itbi')
+                if percentual is not None:
+                    regra_gatilho_texto = f"{percentual}% + ITBI" if inclui_itbi else f"{percentual}%"
+            
+            if percentual is None:
+                regra_texto = c.get('regra_gatilho')
+                if regra_texto:
+                    regra_gatilho_texto = regra_texto
+            
+            # Calcular valor do gatilho
+            if percentual is not None:
+                perc = float(percentual) / 100.0
+                valor_gatilho = (valor_a_vista * perc) + valor_itbi if inclui_itbi else valor_a_vista * perc
+            else:
+                valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
+            
+            atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+            
+            c['valor_pago'] = valor_pago
+            c['valor_itbi'] = valor_itbi
+            c['valor_gatilho'] = valor_gatilho
+            c['atingiu_gatilho'] = atingiu_gatilho
+            c['valor_a_vista'] = valor_a_vista
+            c['regra_gatilho'] = regra_gatilho_texto
         
         # Filtro de período de data do contrato
         if data_inicio or data_fim:
@@ -1279,10 +1575,7 @@ def listar_todas_comissoes():
                 data_contrato = comissao.get('data_contrato')
                 if not data_contrato:
                     return False
-                
-                # Converter para formato comparável (YYYY-MM-DD)
                 try:
-                    # data_contrato pode vir em diferentes formatos
                     if 'T' in str(data_contrato):
                         data_str = str(data_contrato).split('T')[0]
                     else:
@@ -1298,6 +1591,11 @@ def listar_todas_comissoes():
             
             comissoes = [c for c in comissoes if filtrar_por_data(c)]
             print(f"[API] Após filtro de data: {len(comissoes)} comissões")
+        
+        if gatilho_list:
+            gatilho_bools = [g.lower() == 'true' for g in gatilho_list]
+            comissoes = [c for c in comissoes if c.get('atingiu_gatilho') in gatilho_bools]
+            print(f"[API] Após filtro de gatilho: {len(comissoes)} comissões")
         
         return jsonify({
             'sucesso': True,
@@ -1402,6 +1700,13 @@ def listar_comissoes_pendentes_aprovacao():
         aprovacao = AprovacaoComissoes(sync.supabase)
         
         comissoes = aprovacao.listar_comissoes_por_status('Pendente de Aprovação')
+        
+        # Calcular gatilho usando a função centralizada (mesma da consulta por contrato)
+        for c in comissoes:
+            gatilho = obter_gatilho_contrato(sync, c.get('numero_contrato'), c.get('building_id'), c)
+            c['valor_gatilho'] = gatilho['valor_gatilho']
+            c['atingiu_gatilho'] = gatilho['atingiu_gatilho']
+            c['valor_pago'] = gatilho['valor_pago']
         
         return jsonify({
             'sucesso': True,

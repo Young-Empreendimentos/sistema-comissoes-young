@@ -13,6 +13,7 @@ let dadosCorretores = [];
 let dadosContratos = [];
 let observacoesComissoes = {}; // Armazena observações por ID de comissão
 let comissaoAtualObservacao = null; // ID da comissão sendo editada
+let regrasGatilhoDisponiveis = []; // Lista de regras de gatilho disponíveis para seleção
 
 // ================================
 // UTILITÁRIOS
@@ -255,7 +256,7 @@ function setupNavigation() {
             }
             
             if (pageId === 'visualizar-comissoes') {
-                buscarComissoes();
+                carregarRegrasGatilhoDisponiveis();
             } else if (pageId === 'configuracoes') {
                 initConfiguracoes();
             } else if (pageId === 'relatorio-comissoes') {
@@ -416,119 +417,6 @@ function displayContractInfo(info) {
 }
 
 // ================================
-// PÁGINA: CONSULTA POR CONTRATO (LOTE)
-// ================================
-
-async function setupContratoPage() {
-    const loteSearch = document.getElementById('loteSearch');
-    const autocompleteResults = document.getElementById('autocompleteResults');
-    
-    if (!loteSearch) return;
-    
-    let debounceTimer;
-    
-    loteSearch.addEventListener('input', async (e) => {
-        const query = e.target.value.trim();
-        
-        clearTimeout(debounceTimer);
-        
-        if (query.length < 2) {
-            autocompleteResults.classList.remove('active');
-            autocompleteResults.innerHTML = '';
-            return;
-        }
-        
-        debounceTimer = setTimeout(async () => {
-            try {
-                const response = await fetchComRetry(`/api/buscar-por-lote?lote=${encodeURIComponent(query)}`);
-                const contratos = await response.json();
-                
-                if (contratos && contratos.length > 0) {
-                    autocompleteResults.innerHTML = contratos.map(c => {
-                        const unidadeDisplay = extrairNumeroLote(c.unidade || c.unidades);
-                        const loteNumero = unidadeDisplay || c.numero_contrato;
-                        return `
-                        <div class="autocomplete-item" data-numero="${c.numero_contrato}" data-building="${c.building_id}">
-                            <strong>Lote ${loteNumero}</strong> - ${corrigirEspacamentoNome(c.nome_cliente)}<br>
-                            <small>${c.sienge_empreendimentos?.nome || ''} - Contrato: ${c.numero_contrato}</small>
-                        </div>
-                    `}).join('');
-                    
-                    autocompleteResults.classList.add('active');
-                    
-                    autocompleteResults.querySelectorAll('.autocomplete-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            const numeroContrato = item.dataset.numero;
-                            const buildingId = item.dataset.building;
-                            selectLoteContrato(numeroContrato, buildingId);
-                            autocompleteResults.classList.remove('active');
-                            loteSearch.value = numeroContrato;
-                        });
-                    });
-                } else {
-                    autocompleteResults.innerHTML = '<div class="autocomplete-item">Nenhum resultado encontrado</div>';
-                    autocompleteResults.classList.add('active');
-                }
-            } catch (error) {
-                console.error('Erro na busca:', error);
-            }
-        }, 300);
-    });
-    
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.autocomplete-wrapper')) {
-            autocompleteResults.classList.remove('active');
-        }
-    });
-}
-
-async function selectLoteContrato(numeroContrato, buildingId) {
-    showLoading('loadingInfoLote');
-    const loteInfo = document.getElementById('loteInfo');
-    if (loteInfo) loteInfo.classList.add('hidden');
-    
-    try {
-        const response = await fetchComRetry(`/api/contrato-info?numero_contrato=${numeroContrato}&building_id=${buildingId}`);
-        const info = await response.json();
-        
-        if (info.erro) {
-            showAlert(info.erro, 'error');
-        } else {
-            displayLoteInfo(info);
-        }
-    } catch (error) {
-        console.error('Erro ao carregar info do lote:', error);
-        showAlert('Erro ao carregar informações', 'error');
-    }
-    
-    hideLoading('loadingInfoLote');
-}
-
-function displayLoteInfo(info) {
-    const loteInfo = document.getElementById('loteInfo');
-    if (!loteInfo) return;
-    
-    document.getElementById('infoLoteNumero').textContent = info.numero_contrato || '-';
-    document.getElementById('infoLoteEmpreendimento').textContent = info.empreendimento_nome || '-';
-    document.getElementById('infoLoteCliente').textContent = corrigirEspacamentoNome(info.nome_cliente);
-    document.getElementById('infoLoteCorretor').textContent = corrigirEspacamentoNome(info.corretor_principal);
-    document.getElementById('infoLoteComissao').textContent = formatCurrency(info.valor_comissao);
-    document.getElementById('infoLoteValorTotal').textContent = formatCurrency(info.valor_a_vista || info.valor_total);
-    document.getElementById('infoLoteITBI').textContent = formatCurrency(info.valor_itbi);
-    document.getElementById('infoLoteValorPago').textContent = formatCurrency(info.valor_pago);
-    
-    const gatilhoLote = document.getElementById('gatilhoInfoLote');
-    if (gatilhoLote) {
-        document.getElementById('infoLoteRegraGatilho').textContent = info.regra_gatilho || '10% + ITBI';
-        document.getElementById('infoLoteValorGatilho').textContent = formatCurrency(info.valor_gatilho);
-        document.getElementById('infoLoteAtingiuGatilho').textContent = info.atingiu_gatilho ? 'SIM' : 'NÃO';
-        document.getElementById('infoLoteAtingiuGatilho').className = info.atingiu_gatilho ? 'info-value gatilho-sim' : 'info-value gatilho-nao';
-        gatilhoLote.classList.remove('hidden');
-    }
-    
-    loteInfo.classList.remove('hidden');
-}
-
 // ================================
 // PÁGINA: CONSULTA POR CORRETOR
 // ================================
@@ -735,26 +623,71 @@ document.addEventListener('click', function(e) {
 // PÁGINA: VISUALIZAR COMISSÕES
 // ================================
 
+/**
+ * Carrega as regras de gatilho disponíveis para uso no dropdown
+ */
+async function carregarRegrasGatilhoDisponiveis() {
+    try {
+        const response = await fetch('/api/regras-gatilho');
+        if (response.ok) {
+            const data = await response.json();
+            regrasGatilhoDisponiveis = Array.isArray(data) ? data : (data.regras || []);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar regras de gatilho:', error);
+        regrasGatilhoDisponiveis = [];
+    }
+}
+
 async function buscarComissoes() {
     const loading = document.getElementById('loadingComissoes');
     const tabelaContainer = document.getElementById('tabelaComissoesContainer');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressTexto = document.getElementById('progressTexto');
+    const loadingTexto = document.getElementById('loadingComissoesTexto');
     
     if (loading) loading.style.display = 'block';
     if (tabelaContainer) tabelaContainer.style.display = 'none';
     
+    // Mostrar barra de progresso simulada
+    if (progressContainer) progressContainer.style.display = 'block';
+    if (loadingTexto) loadingTexto.textContent = 'Buscando comissões no banco de dados...';
+    
+    let progressoAtual = 0;
+    const atualizarProgresso = (valor, texto) => {
+        progressoAtual = valor;
+        if (progressBar) progressBar.style.width = `${valor}%`;
+        if (progressTexto) progressTexto.textContent = `${valor}%`;
+        if (loadingTexto && texto) loadingTexto.textContent = texto;
+    };
+    
+    // Simulação de progresso enquanto aguarda a resposta
+    atualizarProgresso(10, 'Buscando comissões no banco de dados...');
+    const progressInterval = setInterval(() => {
+        if (progressoAtual < 85) {
+            const incremento = Math.random() * 8 + 2;
+            const novoValor = Math.min(progressoAtual + incremento, 85);
+            const textos = [
+                'Carregando dados dos contratos...',
+                'Processando valores de ITBI...',
+                'Calculando valores pagos...',
+                'Verificando regras de gatilho...',
+                'Processando comissões...'
+            ];
+            const textoIdx = Math.floor(novoValor / 20);
+            atualizarProgresso(Math.round(novoValor), textos[Math.min(textoIdx, textos.length - 1)]);
+        }
+    }, 500);
+    
     try {
-        // Obter valores dos multi-selects
         const statusParcela = getMultiSelectValues('statusParcela');
         const gatilhoAtingido = getMultiSelectValues('gatilho');
         const statusAprovacao = getMultiSelectValues('statusAprovacao');
-        
-        // Obter filtros de data
         const dataInicio = document.getElementById('filtroDataInicio')?.value || '';
         const dataFim = document.getElementById('filtroDataFim')?.value || '';
         
         let url = '/api/comissoes/listar?';
-        
-        // Enviar arrays como valores separados por vírgula
         if (statusParcela.length > 0) url += `status_parcela=${statusParcela.join(',')}&`;
         if (gatilhoAtingido.length > 0) url += `gatilho_atingido=${gatilhoAtingido.join(',')}&`;
         if (statusAprovacao.length > 0) url += `status_aprovacao=${statusAprovacao.join(',')}&`;
@@ -762,18 +695,32 @@ async function buscarComissoes() {
         if (dataFim) url += `data_fim=${dataFim}&`;
         
         const response = await fetchComRetry(url);
+        
+        clearInterval(progressInterval);
+        atualizarProgresso(90, 'Processando resultados...');
+        
         const data = await response.json();
         
-        if (loading) loading.style.display = 'none';
+        atualizarProgresso(95, 'Renderizando tabela...');
         
         if (data.sucesso && data.comissoes) {
             renderizarTabelaComissoes(data.comissoes);
-            if (tabelaContainer) tabelaContainer.style.display = 'block';
+            atualizarProgresso(100, 'Concluído!');
             
-            // Mostrar contagem de resultados
+            setTimeout(() => {
+                if (loading) loading.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (tabelaContainer) tabelaContainer.style.display = 'block';
+            }, 300);
+            
             const total = data.total || data.comissoes.length;
             showAlert(`${total} comissões encontradas`, 'info');
         } else {
+            atualizarProgresso(100, 'Nenhuma comissão encontrada');
+            setTimeout(() => {
+                if (loading) loading.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+            }, 300);
             showAlert('Nenhuma comissão encontrada', 'info');
             const tbody = document.getElementById('corpoTabelaComissoes');
             if (tbody) {
@@ -782,8 +729,10 @@ async function buscarComissoes() {
             if (tabelaContainer) tabelaContainer.style.display = 'block';
         }
     } catch (error) {
+        clearInterval(progressInterval);
         console.error('Erro ao buscar comissões:', error);
         if (loading) loading.style.display = 'none';
+        if (progressContainer) progressContainer.style.display = 'none';
         showAlert('Erro ao carregar comissões', 'error');
     }
 }
@@ -814,8 +763,11 @@ function renderizarTabelaComissoes(comissoes) {
         const isPendente = statusAprovacao === 'Pendente';
         const destacar = isPendente && atingiuGatilho;
         
+        // Gerar dropdown de regras
+        const dropdownRegras = gerarDropdownRegras(c.id, c.regra_gatilho_id, c.regra_gatilho);
+        
         return `
-            <tr class="${destacar ? 'highlight-pendente-gatilho' : ''}">
+            <tr class="${destacar ? 'highlight-pendente-gatilho' : ''}" id="linha-comissao-${c.id}">
                 <td>
                     ${isPendente ? `
                         <input type="checkbox" 
@@ -832,8 +784,9 @@ function renderizarTabelaComissoes(comissoes) {
                 <td>${corrigirEspacamentoNome(c.customer_name)}</td>
                 <td>${formatCurrency(c.valor_comissao || c.commission_value)}</td>
                 <td>${formatCurrency(c.valor_pago || 0)}</td>
-                <td>${formatCurrency(c.valor_gatilho)}</td>
-                <td class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
+                <td>${dropdownRegras}</td>
+                <td id="valor-gatilho-${c.id}">${formatCurrency(c.valor_gatilho)}</td>
+                <td id="atingiu-gatilho-${c.id}" class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
                 <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacaoExibicao}</span></td>
                 <td style="text-align: center;">
                     ${isPendente ? `
@@ -848,6 +801,315 @@ function renderizarTabelaComissoes(comissoes) {
             </tr>
         `;
     }).join('');
+}
+
+/**
+ * Gera o HTML do dropdown de regras para uma comissão
+ */
+function gerarDropdownRegras(comissaoId, regraIdAtual, regraTextoAtual) {
+    let options = `<option value="">Padrão (10% + ITBI)</option>`;
+    
+    regrasGatilhoDisponiveis.forEach(regra => {
+        const selected = regra.id === regraIdAtual ? 'selected' : '';
+        const nomeRegra = regra.nome || `${regra.percentual}%${regra.inclui_itbi ? ' + ITBI' : ''}`;
+        options += `<option value="${regra.id}" ${selected}>${nomeRegra}</option>`;
+    });
+    
+    return `
+        <select 
+            id="select-regra-${comissaoId}"
+            class="select-regra-gatilho"
+            onchange="alterarRegraComissao(${comissaoId}, this.value)"
+            style="padding: 0.4rem; background: #1a1a1a; color: white; border: 1px solid #444; border-radius: 4px; font-size: 0.85rem; min-width: 120px;">
+            ${options}
+        </select>
+    `;
+}
+
+/**
+ * Altera a regra de gatilho de uma comissão e atualiza a interface
+ */
+async function alterarRegraComissao(comissaoId, regraId) {
+    const selectElement = document.getElementById(`select-regra-${comissaoId}`);
+    const valorGatilhoCell = document.getElementById(`valor-gatilho-${comissaoId}`);
+    const atingiuGatilhoCell = document.getElementById(`atingiu-gatilho-${comissaoId}`);
+    
+    // Mostrar estado de carregamento
+    if (selectElement) {
+        selectElement.disabled = true;
+        selectElement.style.opacity = '0.6';
+    }
+    
+    try {
+        const response = await fetch(`/api/comissoes/${comissaoId}/regra`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                regra_gatilho_id: regraId ? parseInt(regraId) : null
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.sucesso) {
+            // Atualizar a célula de valor do gatilho
+            if (valorGatilhoCell) {
+                valorGatilhoCell.textContent = formatCurrency(data.valor_gatilho);
+            }
+            
+            // Atualizar a célula "Atingiu?"
+            if (atingiuGatilhoCell) {
+                atingiuGatilhoCell.textContent = data.atingiu_gatilho ? 'SIM' : 'NÃO';
+                atingiuGatilhoCell.className = data.atingiu_gatilho ? 'gatilho-sim' : 'gatilho-nao';
+            }
+            
+            // Atualizar destaque da linha se necessário
+            const linha = document.getElementById(`linha-comissao-${comissaoId}`);
+            if (linha) {
+                const statusCell = linha.querySelector('.badge-status');
+                const isPendente = statusCell && statusCell.textContent.toLowerCase().includes('pendente');
+                if (isPendente && data.atingiu_gatilho) {
+                    linha.classList.add('highlight-pendente-gatilho');
+                } else {
+                    linha.classList.remove('highlight-pendente-gatilho');
+                }
+            }
+            
+            // Mostrar toast de sucesso
+            mostrarToast('Regra atualizada com sucesso!', 'success');
+        } else {
+            mostrarToast(data.erro || 'Erro ao atualizar regra', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar regra:', error);
+        mostrarToast('Erro de conexão ao atualizar regra', 'error');
+    } finally {
+        // Restaurar estado do select
+        if (selectElement) {
+            selectElement.disabled = false;
+            selectElement.style.opacity = '1';
+        }
+    }
+}
+
+/**
+ * Exibe um toast de notificação
+ */
+function mostrarToast(mensagem, tipo = 'info') {
+    // Remove toast existente se houver
+    const toastExistente = document.querySelector('.toast-notification');
+    if (toastExistente) {
+        toastExistente.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${tipo}`;
+    toast.innerHTML = `
+        <span>${mensagem}</span>
+        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: inherit; cursor: pointer; padding: 0 0 0 10px;">&times;</button>
+    `;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-size: 0.9rem;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        background: ${tipo === 'success' ? '#28a745' : tipo === 'error' ? '#dc3545' : '#17a2b8'};
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 3000);
+}
+
+// ================================
+// PÁGINA: GERENCIAR COMISSÕES (Nova)
+// ================================
+
+async function buscarComissoesGerenciar() {
+    const loading = document.getElementById('loadingComissoesGer');
+    const tabelaContainer = document.getElementById('tabelaComissoesContainerGer');
+    
+    if (loading) loading.style.display = 'block';
+    if (tabelaContainer) tabelaContainer.style.display = 'none';
+    
+    try {
+        // Obter valores dos multi-selects
+        const statusParcela = getMultiSelectValues('statusParcelaGer');
+        const gatilhoAtingido = getMultiSelectValues('gatilhoGer');
+        const statusAprovacao = getMultiSelectValues('statusAprovacaoGer');
+        
+        // Obter filtros de data
+        const dataInicio = document.getElementById('filtroDataInicioGer')?.value || '';
+        const dataFim = document.getElementById('filtroDataFimGer')?.value || '';
+        
+        let url = '/api/comissoes/listar?';
+        
+        // Enviar arrays como valores separados por vírgula
+        if (statusParcela.length > 0) url += `status_parcela=${statusParcela.join(',')}&`;
+        if (gatilhoAtingido.length > 0) url += `gatilho_atingido=${gatilhoAtingido.join(',')}&`;
+        if (statusAprovacao.length > 0) url += `status_aprovacao=${statusAprovacao.join(',')}&`;
+        if (dataInicio) url += `data_inicio=${dataInicio}&`;
+        if (dataFim) url += `data_fim=${dataFim}&`;
+        
+        const response = await fetchComRetry(url);
+        const data = await response.json();
+        
+        if (loading) loading.style.display = 'none';
+        
+        if (data.sucesso && data.comissoes) {
+            renderizarTabelaComissoesGerenciar(data.comissoes);
+            if (tabelaContainer) tabelaContainer.style.display = 'block';
+            
+            // Mostrar contagem de resultados
+            const total = data.total || data.comissoes.length;
+            showAlert(`${total} comissões encontradas`, 'info');
+        } else {
+            showAlert('Nenhuma comissão encontrada', 'info');
+            const tbody = document.getElementById('corpoTabelaComissoesGer');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 2rem; color: #888;">Nenhuma comissão encontrada com os filtros selecionados</td></tr>';
+            }
+            if (tabelaContainer) tabelaContainer.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Erro ao buscar comissões:', error);
+        if (loading) loading.style.display = 'none';
+        showAlert('Erro ao carregar comissões', 'error');
+    }
+}
+
+function renderizarTabelaComissoesGerenciar(comissoes) {
+    const tbody = document.getElementById('corpoTabelaComissoesGer');
+    if (!tbody) return;
+    
+    tbody.innerHTML = comissoes.map(c => {
+        const atingiuGatilho = c.atingiu_gatilho;
+        const statusAprovacao = c.status_aprovacao || 'Pendente';
+        const statusAprovacaoExibicao = traduzirStatusAprovacao(statusAprovacao);
+        
+        // Gerar dropdown de regras
+        const dropdownRegras = gerarDropdownRegrasGer(c.id, c.regra_gatilho_id, c.regra_gatilho);
+        
+        return `
+            <tr id="linha-comissao-ger-${c.id}">
+                <td><span class="badge-status ${getStatusParcelaClass(c.installment_status)}">${traduzirStatusParcela(c.installment_status)}</span></td>
+                <td>${corrigirEspacamentoNome(c.broker_nome)}</td>
+                <td>${c.enterprise_name || '-'}</td>
+                <td>${c.unit_name || '-'}</td>
+                <td>${formatDate(c.data_contrato)}</td>
+                <td>${corrigirEspacamentoNome(c.customer_name)}</td>
+                <td>${formatCurrency(c.valor_comissao || c.commission_value)}</td>
+                <td>${formatCurrency(c.valor_pago || 0)}</td>
+                <td>${dropdownRegras}</td>
+                <td id="valor-gatilho-ger-${c.id}">${formatCurrency(c.valor_gatilho)}</td>
+                <td id="atingiu-gatilho-ger-${c.id}" class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
+                <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacaoExibicao}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function gerarDropdownRegrasGer(comissaoId, regraIdAtual, regraTextoAtual) {
+    let options = `<option value="">Padrão (10% + ITBI)</option>`;
+    
+    regrasGatilhoDisponiveis.forEach(regra => {
+        const selected = regra.id === regraIdAtual ? 'selected' : '';
+        const nomeRegra = regra.nome || `${regra.percentual}%${regra.inclui_itbi ? ' + ITBI' : ''}`;
+        options += `<option value="${regra.id}" ${selected}>${nomeRegra}</option>`;
+    });
+    
+    return `
+        <select 
+            id="select-regra-ger-${comissaoId}"
+            class="select-regra-gatilho"
+            onchange="alterarRegraComissaoGer(${comissaoId}, this.value)"
+            style="padding: 0.4rem; background: #1a1a1a; color: white; border: 1px solid #444; border-radius: 4px; font-size: 0.85rem; min-width: 130px;">
+            ${options}
+        </select>
+    `;
+}
+
+async function alterarRegraComissaoGer(comissaoId, regraId) {
+    const selectElement = document.getElementById(`select-regra-ger-${comissaoId}`);
+    const valorGatilhoCell = document.getElementById(`valor-gatilho-ger-${comissaoId}`);
+    const atingiuGatilhoCell = document.getElementById(`atingiu-gatilho-ger-${comissaoId}`);
+    
+    // Mostrar estado de carregamento
+    if (selectElement) {
+        selectElement.disabled = true;
+        selectElement.style.opacity = '0.6';
+    }
+    
+    try {
+        const response = await fetch(`/api/comissoes/${comissaoId}/regra`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                regra_gatilho_id: regraId ? parseInt(regraId) : null
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.sucesso) {
+            // Atualizar a célula de valor do gatilho
+            if (valorGatilhoCell) {
+                valorGatilhoCell.textContent = formatCurrency(data.valor_gatilho);
+            }
+            
+            // Atualizar a célula "Atingiu?"
+            if (atingiuGatilhoCell) {
+                atingiuGatilhoCell.textContent = data.atingiu_gatilho ? 'SIM' : 'NÃO';
+                atingiuGatilhoCell.className = data.atingiu_gatilho ? 'gatilho-sim' : 'gatilho-nao';
+            }
+            
+            // Mostrar toast de sucesso
+            mostrarToast('Regra atualizada com sucesso!', 'success');
+        } else {
+            mostrarToast(data.erro || 'Erro ao atualizar regra', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar regra:', error);
+        mostrarToast('Erro de conexão ao atualizar regra', 'error');
+    } finally {
+        // Restaurar estado do select
+        if (selectElement) {
+            selectElement.disabled = false;
+            selectElement.style.opacity = '1';
+        }
+    }
+}
+
+function limparFiltrosComissoesGer() {
+    // Limpar multi-selects
+    clearMultiSelect('statusParcelaGer');
+    clearMultiSelect('gatilhoGer');
+    clearMultiSelect('statusAprovacaoGer');
+    
+    // Limpar datas
+    const dataInicio = document.getElementById('filtroDataInicioGer');
+    const dataFim = document.getElementById('filtroDataFimGer');
+    if (dataInicio) dataInicio.value = '';
+    if (dataFim) dataFim.value = '';
 }
 
 function getStatusParcelaClass(status) {
@@ -1860,7 +2122,6 @@ async function inicializarSistema() {
         // Inicializar paginas de forma assincrona com tratamento de erro individual
         await Promise.allSettled([
             setupEmpreendimentoPage().catch(e => console.warn('Erro ao setup empreendimento:', e)),
-            setupContratoPage().catch(e => console.warn('Erro ao setup contrato:', e)),
             setupCorretorPage().catch(e => console.warn('Erro ao setup corretor:', e)),
             carregarStatusParcela().catch(e => console.warn('Erro ao carregar status parcela:', e))
         ]);
@@ -2152,6 +2413,110 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(relatorioPage, { attributes: true });
     }
 });
+
+// ==================== FUNÇÕES DE ITBI ====================
+
+// Carregar contratos sem ITBI
+window.carregarContratosSemItbi = async function() {
+    const loading = document.getElementById('loadingItbi');
+    const tabelaContainer = document.getElementById('tabelaItbiContainer');
+    const emptyState = document.getElementById('emptyStateItbi');
+    
+    try {
+        if (loading) loading.style.display = 'block';
+        if (tabelaContainer) tabelaContainer.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'none';
+        
+        const response = await fetch('/api/contratos-sem-itbi');
+        const data = await response.json();
+        
+        if (loading) loading.style.display = 'none';
+        
+        if (!data.sucesso) {
+            showAlert(data.erro || 'Erro ao carregar contratos sem ITBI', 'error');
+            return;
+        }
+        
+        // Atualizar estatísticas
+        const totalSemItbi = document.getElementById('totalSemItbi');
+        const totalComItbi = document.getElementById('totalComItbi');
+        if (totalSemItbi) totalSemItbi.textContent = data.total || 0;
+        if (totalComItbi) totalComItbi.textContent = data.total_com_itbi || 0;
+        
+        if (!data.contratos || data.contratos.length === 0) {
+            if (emptyState) emptyState.style.display = 'block';
+            return;
+        }
+        
+        if (tabelaContainer) tabelaContainer.style.display = 'block';
+        renderizarTabelaItbi(data.contratos);
+        
+    } catch (error) {
+        console.error('Erro ao carregar contratos sem ITBI:', error);
+        if (loading) loading.style.display = 'none';
+        showAlert('Erro ao carregar contratos sem ITBI', 'error');
+    }
+};
+
+// Renderizar tabela de ITBI
+function renderizarTabelaItbi(contratos) {
+    const tbody = document.getElementById('corpoTabelaItbi');
+    if (!tbody) return;
+    
+    tbody.innerHTML = contratos.map(contrato => `
+        <tr style="border-bottom: 1px solid #333; transition: background 0.2s;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 1rem; font-weight: 600; color: #FE5009;">${contrato.numero_contrato || '-'}</td>
+            <td style="padding: 1rem;">${contrato.empreendimento || '-'}</td>
+            <td style="padding: 1rem;">${contrato.unidade || '-'}</td>
+            <td style="padding: 1rem;">${contrato.nome_cliente || '-'}</td>
+            <td style="padding: 1rem; color: #888;">${formatDate(contrato.data_contrato)}</td>
+        </tr>
+    `).join('');
+}
+
+// Sincronizar ITBIs faltantes do Sienge
+window.sincronizarItbiFaltantes = async function() {
+    const btn = document.getElementById('btnSincronizarItbi');
+    const originalHtml = btn ? btn.innerHTML : '';
+    
+    if (!confirm('Deseja sincronizar os ITBIs faltantes do Sienge?\n\nIsso pode levar alguns minutos dependendo da quantidade de contratos.')) {
+        return;
+    }
+    
+    try {
+        if (btn) {
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Sincronizando...';
+            btn.disabled = true;
+        }
+        
+        const response = await fetch('/api/sincronizar-itbi-faltantes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.sucesso) {
+            const resultado = data.resultado || {};
+            const mensagem = `Sincronização concluída! ${resultado.total || 0} novos ITBIs encontrados de ${resultado.total_sem_itbi || 0} contratos verificados.`;
+            
+            showAlert(mensagem, 'success');
+            
+            // Recarregar lista
+            carregarContratosSemItbi();
+        } else {
+            showAlert(data.erro || 'Erro ao sincronizar ITBIs', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao sincronizar ITBIs:', error);
+        showAlert('Erro ao sincronizar ITBIs', 'error');
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }
+};
 
 // Garantir que o DOM esta completamente carregado
 if (document.readyState === 'loading') {

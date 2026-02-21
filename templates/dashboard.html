@@ -23,7 +23,6 @@
             <nav class="nav-tabs">
                 <button class="nav-tab active" data-page="home">Página Inicial</button>
                 <button class="nav-tab" data-page="empreendimento">Consulta por Empreendimento</button>
-                <button class="nav-tab" data-page="contrato">Consulta por Contrato</button>
                 <button class="nav-tab" data-page="corretor">Consulta por Corretor</button>
                 {% if user.is_admin %}
                 <button class="nav-tab" data-page="visualizar-comissoes">Visualizar Comissões</button>
@@ -153,95 +152,6 @@
         </div>
 
         <!-- Página: Consulta por Contrato -->
-        <div id="contrato" class="page">
-            <div class="page-content">
-                <div class="card">
-                    <h2 class="card-title">
-                        <span>Buscar por Número do Lote</span>
-                    </h2>
-
-                    <div class="form-group autocomplete-wrapper">
-                        <label class="form-label" for="loteSearch">Digite o número do lote</label>
-                        <input 
-                            type="text" 
-                            id="loteSearch" 
-                            class="form-input" 
-                            placeholder="Ex: 2224"
-                            autocomplete="off"
-                        />
-                        <div id="autocompleteResults" class="autocomplete-results"></div>
-                    </div>
-                </div>
-
-                <!-- Loading Info Lote -->
-                <div id="loadingInfoLote" class="loading">
-                    <div class="spinner"></div>
-                    <p>Carregando informações...</p>
-                </div>
-
-                <!-- Card de Informações do Lote -->
-                <div id="loteInfo" class="card hidden">
-                    <h2 class="card-title">
-                        <span>Informações do Lote</span>
-                    </h2>
-
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <div class="info-label">Lote</div>
-                            <div class="info-value" id="infoLoteNumero">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Empreendimento</div>
-                            <div class="info-value" id="infoLoteEmpreendimento">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Cliente</div>
-                            <div class="info-value" id="infoLoteCliente">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Corretor</div>
-                            <div class="info-value" id="infoLoteCorretor">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Comissão</div>
-                            <div class="info-value currency" id="infoLoteComissao">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Valor à Vista</div>
-                            <div class="info-value currency" id="infoLoteValorTotal">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">ITBI</div>
-                            <div class="info-value currency" id="infoLoteITBI">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Valor Pago</div>
-                            <div class="info-value currency" id="infoLoteValorPago">-</div>
-                        </div>
-                    </div>
-
-                    <!-- Gatilho do Lote -->
-                    <div id="gatilhoInfoLote" class="card-section hidden" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #333;">
-                        <h3 style="margin-bottom: 1rem; color: #FE5009;">Informações do Gatilho para Comissão</h3>
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <div class="info-label">Regra do Gatilho</div>
-                                <div class="info-value" id="infoLoteRegraGatilho">-</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Valor do Gatilho</div>
-                                <div class="info-value currency" id="infoLoteValorGatilho">-</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Atingiu Gatilho?</div>
-                                <div class="info-value" id="infoLoteAtingiuGatilho">-</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Página: Consulta por Corretor -->
         <div id="corretor" class="page">
             <div class="page-content">
@@ -285,7 +195,7 @@
                     <p class="card-subtitle">Visualize e gerencie todas as comissões do sistema</p>
 
                     <!-- Filtros -->
-                    <div class="filtros-comissoes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: #1a1a1a; border-radius: 12px; border: 1px solid #333;">
+                    <div class="filtros-comissoes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
                         <!-- Filtro Status SIENGE (Multi-select) -->
                         <div class="form-group">
                             <label class="form-label">Status SIENGE</label>
@@ -387,10 +297,16 @@
                         <button class="btn-primary" onclick="enviarParaAprovacao()">Enviar para Aprovação da Direção</button>
                     </div>
 
-                    <!-- Loading -->
+                    <!-- Loading com progresso -->
                     <div id="loadingComissoes" class="loading" style="display: none;">
                         <div class="spinner"></div>
-                        <p>Carregando comissões...</p>
+                        <p id="loadingComissoesTexto">Carregando comissões...</p>
+                        <div id="progressContainer" style="width: 100%; max-width: 300px; margin-top: 1rem; display: none;">
+                            <div style="background: #333; border-radius: 8px; height: 8px; overflow: hidden;">
+                                <div id="progressBar" style="background: linear-gradient(90deg, #FE5009, #ff7a3d); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                            </div>
+                            <p id="progressTexto" style="text-align: center; margin-top: 0.5rem; font-size: 0.85rem; color: #888;">0%</p>
+                        </div>
                     </div>
 
                     <!-- Tabela -->
@@ -407,6 +323,7 @@
                                     <th style="padding: 1rem;">Cliente</th>
                                     <th style="padding: 1rem;">Valor Comissão</th>
                                     <th style="padding: 1rem;">Valor Pago</th>
+                                    <th style="padding: 1rem;">Regra</th>
                                     <th style="padding: 1rem;">Valor Gatilho</th>
                                     <th style="padding: 1rem;">Atingiu?</th>
                                     <th style="padding: 1rem;">Status Aprovação</th>
@@ -414,7 +331,7 @@
                                 </tr>
                             </thead>
                             <tbody id="corpoTabelaComissoes">
-                                <tr><td colspan="13" style="text-align: center; padding: 2rem;">Clique em "Buscar" para carregar as comissões</td></tr>
+                                <tr><td colspan="14" style="text-align: center; padding: 2rem;">Clique em "Buscar" para carregar as comissões</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1265,6 +1182,6 @@
         }
     </style>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=99"></script>
 </body>
 </html>

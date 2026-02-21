@@ -16,14 +16,10 @@ class SiengeClient:
     """Cliente para API do Sienge"""
     
     def __init__(self):
-        # URL atualizada para v1 (mudança do Sienge em 2026)
-        self.base_url = os.getenv('SIENGE_BASE_URL', 'https://api.sienge.com.br/youngemp/public/api/v1')
+        self.base_url = os.getenv('SIENGE_BASE_URL', 'https://api.sienge.com.br/youngemp/public/api')
         self.username = os.getenv('SIENGE_USERNAME')
         self.password = os.getenv('SIENGE_PASSWORD')
         self.company_id = os.getenv('SIENGE_COMPANY_ID', '5')
-        # Lista de todas as empresas para sincronizar
-        company_ids_str = os.getenv('SIENGE_COMPANY_IDS', '5')
-        self.all_company_ids = [c.strip() for c in company_ids_str.split(',') if c.strip()]
         self.auth = HTTPBasicAuth(self.username, self.password)
         self.timeout = 30
     
@@ -46,8 +42,7 @@ class SiengeClient:
     def get_buildings(self) -> List[Dict]:
         """Busca todos os empreendimentos"""
         try:
-            # Endpoint renomeado de 'buildings' para 'enterprises' na v1
-            result = self._make_request('enterprises', {'companyId': self.company_id})
+            result = self._make_request('buildings', {'companyId': self.company_id})
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
             return result if isinstance(result, list) else []
@@ -58,10 +53,8 @@ class SiengeClient:
     def get_building_units(self, building_id: int) -> List[Dict]:
         """Busca unidades de um empreendimento"""
         try:
-            # Endpoint mudou na v1: de 'buildings/{id}/units' para 'units?enterpriseId={id}'
-            result = self._make_request('units', {
-                'companyId': self.company_id,
-                'enterpriseId': building_id
+            result = self._make_request(f'buildings/{building_id}/units', {
+                'companyId': self.company_id
             })
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
@@ -110,12 +103,13 @@ class SiengeClient:
             return None
     
     def get_brokers(self, building_id: int = None) -> List[Dict]:
-        """Busca corretores - Usa endpoint /commissions/configurations/brokers na v1"""
+        """Busca corretores"""
         try:
-            # Na v1, corretores ficam em /commissions/configurations/brokers
-            result = self._make_request('commissions/configurations/brokers', {
-                'companyId': self.company_id
-            })
+            params = {'companyId': self.company_id}
+            if building_id:
+                params['buildingId'] = building_id
+            
+            result = self._make_request('brokers', params)
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
             return result if isinstance(result, list) else []
@@ -131,10 +125,9 @@ class SiengeClient:
                 'brokerId': broker_id
             }
             if building_id:
-                params['enterpriseId'] = building_id
+                params['buildingId'] = building_id
             
-            # Na v1, endpoint mudou de 'broker-commissions' para 'commissions'
-            result = self._make_request('commissions', params)
+            result = self._make_request('broker-commissions', params)
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
             return result if isinstance(result, list) else []
@@ -151,10 +144,9 @@ class SiengeClient:
                 'limit': limit
             }
             if building_id:
-                params['enterpriseId'] = building_id
+                params['buildingId'] = building_id
             
-            # Na v1, endpoint mudou de 'broker-commissions' para 'commissions'
-            result = self._make_request('commissions', params)
+            result = self._make_request('broker-commissions', params)
             if result and 'resultSetMetadata' in result:
                 return result.get('results', [])
             return result if isinstance(result, list) else []
@@ -178,11 +170,15 @@ class SiengeClient:
             return []
     
     def get_receivables(self, contract_id: int) -> List[Dict]:
-        """Busca parcelas/recebíveis de um contrato - Endpoint não disponível na v1"""
-        # Na v1 da API Sienge, o endpoint de receivables não está disponível
-        # Os dados de parcelas vêm através de broker-commissions (paymentBills)
-        print(f"[AVISO] Endpoint receivables não disponível na v1 da API Sienge")
-        return []
+        """Busca parcelas/recebíveis de um contrato"""
+        try:
+            result = self._make_request(f'sales-contracts/{contract_id}/receivables')
+            if result and 'resultSetMetadata' in result:
+                return result.get('results', [])
+            return result if isinstance(result, list) else []
+        except Exception as e:
+            print(f"Erro ao buscar recebíveis: {str(e)}")
+            return []
     
     def get_all_contracts_paginated(self, building_id: int = None) -> List[Dict]:
         """Busca todos os contratos com paginação automática"""
@@ -217,181 +213,6 @@ class SiengeClient:
             offset += limit
         
         return all_commissions
-    
-    def get_commissions_all_companies(self) -> List[Dict]:
-        """Busca comissões de TODAS as empresas cadastradas"""
-        all_commissions = []
-        original_company_id = self.company_id
-        
-        for company_id in self.all_company_ids:
-            self.company_id = company_id
-            try:
-                commissions = self.get_all_commissions_paginated()
-                if commissions:
-                    print(f"[Sienge] Empresa {company_id}: {len(commissions)} comissões")
-                    all_commissions.extend(commissions)
-            except Exception as e:
-                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
-        
-        self.company_id = original_company_id
-        print(f"[Sienge] Total de comissões (todas empresas): {len(all_commissions)}")
-        return all_commissions
-    
-    def get_contracts_all_companies(self) -> List[Dict]:
-        """Busca contratos de TODAS as empresas cadastradas"""
-        all_contracts = []
-        original_company_id = self.company_id
-        
-        for company_id in self.all_company_ids:
-            self.company_id = company_id
-            try:
-                contracts = self.get_all_contracts_paginated()
-                if contracts:
-                    print(f"[Sienge] Empresa {company_id}: {len(contracts)} contratos")
-                    all_contracts.extend(contracts)
-            except Exception as e:
-                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
-        
-        self.company_id = original_company_id
-        print(f"[Sienge] Total de contratos (todas empresas): {len(all_contracts)}")
-        return all_contracts
-    
-    def get_buildings_all_companies(self) -> List[Dict]:
-        """Busca empreendimentos de TODAS as empresas cadastradas"""
-        all_buildings = []
-        original_company_id = self.company_id
-        
-        for company_id in self.all_company_ids:
-            self.company_id = company_id
-            try:
-                buildings = self.get_buildings()
-                if buildings:
-                    print(f"[Sienge] Empresa {company_id}: {len(buildings)} empreendimentos")
-                    all_buildings.extend(buildings)
-            except Exception as e:
-                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
-        
-        self.company_id = original_company_id
-        print(f"[Sienge] Total de empreendimentos (todas empresas): {len(all_buildings)}")
-        return all_buildings
-    
-    def get_bill_prv(self, document_number: str) -> Optional[Dict]:
-        """Busca título a pagar PRV (ITBI) pelo número do documento - tenta vários formatos"""
-        # Remover zeros à esquerda mantendo letras (ex: "0302C" -> "302C")
-        num_sem_zeros = document_number.lstrip('0') or document_number
-        
-        # Tentar diferentes formatos do número
-        formatos = [
-            document_number,                          # Original: "46" ou "302C"
-            num_sem_zeros,                            # Sem zeros: "302C" de "0302C"
-            f"Lote {document_number}",                # Com Lote: "Lote 46"
-            f"Lote {num_sem_zeros}",                  # Lote sem zeros: "Lote 302C"
-        ]
-        
-        # Remover duplicatas mantendo ordem
-        formatos_unicos = list(dict.fromkeys(formatos))
-        
-        for fmt in formatos_unicos:
-            try:
-                params = {
-                    'companyId': self.company_id,
-                    'documentId': 'PRV',
-                    'documentNumber': fmt,
-                    'startDate': '2020-01-01',
-                    'endDate': '2030-12-31',
-                    'limit': 10
-                }
-                result = self._make_request_silent('bills', params)
-                if result and 'results' in result and result['results']:
-                    return result['results'][0]
-            except:
-                pass
-        return None
-    
-    def _make_request_silent(self, endpoint: str, params: dict = None) -> Optional[dict]:
-        """Faz requisição à API do Sienge sem mostrar erros (para buscas opcionais)"""
-        try:
-            url = f"{self.base_url}/{endpoint}"
-            response = requests.get(
-                url,
-                auth=self.auth,
-                params=params,
-                timeout=self.timeout
-            )
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except:
-            return None
-    
-    def get_bills_prv_all_companies(self, document_number: str) -> Optional[Dict]:
-        """Busca título PRV em TODAS as empresas"""
-        original_company_id = self.company_id
-        
-        for company_id in self.all_company_ids:
-            self.company_id = company_id
-            try:
-                bill = self.get_bill_prv(document_number)
-                if bill:
-                    self.company_id = original_company_id
-                    return bill
-            except:
-                pass
-        
-        self.company_id = original_company_id
-        return None
-    
-    def get_receivable_bills(self, offset: int = 0, limit: int = 100) -> List[Dict]:
-        """Busca títulos a receber (valores pagos)"""
-        try:
-            params = {
-                'companyId': self.company_id,
-                'offset': offset,
-                'limit': limit
-            }
-            result = self._make_request('accounts-receivable/receivable-bills', params)
-            if result and 'results' in result:
-                return result.get('results', [])
-            return result if isinstance(result, list) else []
-        except Exception as e:
-            print(f"Erro ao buscar receivable-bills: {str(e)}")
-            return []
-    
-    def get_all_receivable_bills_paginated(self) -> List[Dict]:
-        """Busca todos os títulos a receber com paginação"""
-        all_bills = []
-        offset = 0
-        limit = 100
-        
-        while True:
-            bills = self.get_receivable_bills(offset=offset, limit=limit)
-            if not bills:
-                break
-            all_bills.extend(bills)
-            if len(bills) < limit:
-                break
-            offset += limit
-        
-        return all_bills
-    
-    def get_receivable_bills_all_companies(self) -> List[Dict]:
-        """Busca títulos a receber de TODAS as empresas"""
-        all_bills = []
-        original_company_id = self.company_id
-        
-        for company_id in self.all_company_ids:
-            self.company_id = company_id
-            try:
-                bills = self.get_all_receivable_bills_paginated()
-                if bills:
-                    print(f"[Sienge] Empresa {company_id}: {len(bills)} títulos a receber")
-                    all_bills.extend(bills)
-            except Exception as e:
-                print(f"[Sienge] Erro na empresa {company_id}: {str(e)}")
-        
-        self.company_id = original_company_id
-        print(f"[Sienge] Total de títulos a receber (todas empresas): {len(all_bills)}")
-        return all_bills
 
 
 # Instância global
