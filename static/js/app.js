@@ -1706,7 +1706,7 @@ window.salvarConfiguracoesEmails = async function() {
     const emailsInvalidos = emails.filter(e => !emailRegex.test(e));
     
     if (emailsInvalidos.length > 0) {
-        mostrarNotificacao(`E-mails inválidos: ${emailsInvalidos.join(', ')}`, 'error');
+        showAlert(`E-mails inválidos: ${emailsInvalidos.join(', ')}`, 'error');
         return;
     }
     
@@ -1720,15 +1720,15 @@ window.salvarConfiguracoesEmails = async function() {
         const data = await response.json();
         
         if (data.sucesso) {
-            mostrarNotificacao('E-mails atualizados com sucesso!', 'success');
+            showAlert('E-mails atualizados com sucesso!', 'success');
             fecharModalEditarEmails();
             carregarConfiguracoesEmails();
         } else {
-            mostrarNotificacao(data.erro || 'Erro ao salvar e-mails', 'error');
+            showAlert(data.erro || 'Erro ao salvar e-mails', 'error');
         }
     } catch (error) {
         console.error('Erro ao salvar configurações de e-mails:', error);
-        mostrarNotificacao('Erro ao salvar configurações', 'error');
+        showAlert('Erro ao salvar configurações', 'error');
     }
 };
 
