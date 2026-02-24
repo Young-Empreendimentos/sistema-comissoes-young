@@ -1449,6 +1449,30 @@ input[type="checkbox"]:focus-visible {
     box-shadow: 0 0 0 3px var(--color-primary-ring);
 }
 
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    animation: fadeIn var(--transition-fast) ease-out;
+    backdrop-filter: blur(4px);
+}
+
+.modal-body {
+    margin-bottom: var(--spacing-lg);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+}
+
 /* ================================
    SCROLLBAR
    ================================ */

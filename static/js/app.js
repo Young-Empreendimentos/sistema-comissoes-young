@@ -1627,6 +1627,111 @@ function renderizarConfiguracoesEmails(configuracoes) {
     `).join('');
 }
 
+// Abrir modal para editar e-mails de configuração
+window.abrirModalEditarEmails = function(tipo, emailsAtuais) {
+    // Criar modal dinamicamente
+    let modal = document.getElementById('modalEditarEmails');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalEditarEmails';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3 id="tituloModalEmails">Editar E-mails</h3>
+                    <button class="modal-close" onclick="fecharModalEditarEmails()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 1rem; color: #999; font-size: 0.9rem;">
+                        Informe os e-mails separados por vírgula. Esses e-mails receberão notificações automáticas do sistema.
+                    </p>
+                    <div class="form-group">
+                        <label for="inputEmailsConfig" class="form-label">E-mails</label>
+                        <textarea 
+                            id="inputEmailsConfig" 
+                            class="form-input" 
+                            rows="4" 
+                            placeholder="email1@exemplo.com, email2@exemplo.com"
+                            style="resize: vertical;"></textarea>
+                    </div>
+                    <input type="hidden" id="tipoEmailConfig" value="">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="fecharModalEditarEmails()">Cancelar</button>
+                    <button class="btn-primary" onclick="salvarConfiguracoesEmails()">Salvar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Definir título baseado no tipo
+    const titulos = {
+        'comissao_liberada': 'E-mails - Comissão Liberada',
+        'comissao_aprovada': 'E-mails - Comissão Aprovada',
+        'comissao_reprovada': 'E-mails - Comissão Reprovada',
+        'financeiro': 'E-mails - Financeiro',
+        'direcao': 'E-mails - Direção'
+    };
+    
+    document.getElementById('tituloModalEmails').textContent = titulos[tipo] || `Editar E-mails - ${tipo}`;
+    document.getElementById('inputEmailsConfig').value = emailsAtuais || '';
+    document.getElementById('tipoEmailConfig').value = tipo;
+    
+    modal.style.display = 'flex';
+    document.getElementById('inputEmailsConfig').focus();
+};
+
+// Fechar modal de edição de e-mails
+window.fecharModalEditarEmails = function() {
+    const modal = document.getElementById('modalEditarEmails');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
+// Salvar configurações de e-mails
+window.salvarConfiguracoesEmails = async function() {
+    const tipo = document.getElementById('tipoEmailConfig').value;
+    const emailsInput = document.getElementById('inputEmailsConfig').value;
+    
+    // Processar e-mails: separar por vírgula, limpar espaços, remover vazios
+    const emails = emailsInput
+        .split(',')
+        .map(e => e.trim())
+        .filter(e => e.length > 0);
+    
+    // Validar formato dos e-mails
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailsInvalidos = emails.filter(e => !emailRegex.test(e));
+    
+    if (emailsInvalidos.length > 0) {
+        mostrarNotificacao(`E-mails inválidos: ${emailsInvalidos.join(', ')}`, 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/configuracoes-emails/${tipo}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ emails })
+        });
+        
+        const data = await response.json();
+        
+        if (data.sucesso) {
+            mostrarNotificacao('E-mails atualizados com sucesso!', 'success');
+            fecharModalEditarEmails();
+            carregarConfiguracoesEmails();
+        } else {
+            mostrarNotificacao(data.erro || 'Erro ao salvar e-mails', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar configurações de e-mails:', error);
+        mostrarNotificacao('Erro ao salvar configurações', 'error');
+    }
+};
+
 // ================================
 // SINCRONIZAÇÃO
 // ================================
