@@ -126,27 +126,41 @@ class SiengeSupabaseSync:
             count = 0
             
             for commission in commissions:
+                # Campos corretos da API Sienge (conforme documentação):
+                # commissionID, salesContractNumber, enterpriseID, brokerID, etc.
+                sienge_id = commission.get('commissionID') or commission.get('id')
+                
+                if not sienge_id:
+                    print(f"[WARN] Comissão sem ID: {commission}")
+                    continue
+                
                 data = {
-                    'sienge_id': commission.get('id'),
-                    'numero_contrato': commission.get('contractNumber'),
-                    'building_id': commission.get('buildingId'),
+                    'sienge_id': sienge_id,
+                    'numero_contrato': commission.get('salesContractNumber') or commission.get('contractNumber'),
+                    'building_id': commission.get('enterpriseID') or commission.get('buildingId'),
                     'company_id': commission.get('companyId'),
-                    'broker_id': commission.get('brokerId'),
+                    'broker_id': commission.get('brokerID') or commission.get('brokerId'),
                     'broker_nome': commission.get('brokerName'),
                     'customer_name': commission.get('customerName'),
                     'enterprise_name': commission.get('enterpriseName') or commission.get('buildingName'),
                     'unit_name': commission.get('unitName'),
-                    'commission_value': commission.get('commissionValue') or commission.get('value'),
-                    'installment_status': commission.get('installmentStatus') or commission.get('status'),
-                    'commission_date': commission.get('commissionDate') or commission.get('date'),
-                    'status_aprovacao': 'Pendente',
+                    'commission_value': commission.get('value') or commission.get('commissionValue'),
+                    'installment_status': commission.get('installmentStatus'),
+                    'commission_date': commission.get('dueDate') or commission.get('commissionDate') or commission.get('date'),
                     'atualizado_em': datetime.now().isoformat()
                 }
                 
-                self.supabase.table('sienge_comissoes').upsert(
-                    data,
-                    on_conflict='sienge_id'
-                ).execute()
+                # Verificar se a comissão já existe para não sobrescrever status_aprovacao
+                existing = self.supabase.table('sienge_comissoes').select('id, status_aprovacao').eq('sienge_id', sienge_id).execute()
+                
+                if existing.data and len(existing.data) > 0:
+                    # Comissão existe - atualizar sem mudar status_aprovacao
+                    self.supabase.table('sienge_comissoes').update(data).eq('sienge_id', sienge_id).execute()
+                else:
+                    # Comissão nova - inserir com status_aprovacao = Pendente
+                    data['status_aprovacao'] = 'Pendente'
+                    self.supabase.table('sienge_comissoes').insert(data).execute()
+                
                 count += 1
             
             return {'sucesso': True, 'total': count}
