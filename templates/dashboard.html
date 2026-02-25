@@ -195,7 +195,7 @@
                     <p class="card-subtitle">Visualize e gerencie todas as comissões do sistema</p>
 
                     <!-- Filtros -->
-                    <div class="filtros-comissoes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+                    <div class="filtros-comissoes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); position: relative; z-index: 100;">
                         <!-- Filtro Status SIENGE (Multi-select) -->
                         <div class="form-group">
                             <label class="form-label">Status SIENGE</label>
@@ -310,7 +310,7 @@
                     </div>
 
                     <!-- Tabela -->
-                    <div id="tabelaComissoesContainer" style="overflow-x: auto;">
+                    <div id="tabelaComissoesContainer" style="overflow-x: auto; position: relative; z-index: 1;">
                         <table class="tabela-comissoes" style="width: 100%; border-collapse: collapse;">
                             <thead>
                                 <tr style="background: linear-gradient(135deg, #FE5009, #c73d00); color: white;">
