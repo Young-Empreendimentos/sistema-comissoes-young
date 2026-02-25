@@ -212,15 +212,14 @@ class AprovacaoComissoes:
                     # Pegar observação específica desta comissão
                     observacao_comissao = observacoes.get(str(comissao_id), observacoes.get(comissao_id))
                     
-                    # Atualizar status
+                    # Atualizar status (sem observacoes_direcao pois coluna não existe)
                     self.supabase.table('sienge_comissoes').update({
                         'status_aprovacao': self.STATUS_APROVADA,
                         'data_aprovacao': datetime.now().isoformat(),
-                        'aprovado_por': usuario_id,
-                        'observacoes_direcao': observacao_comissao
+                        'aprovado_por': usuario_id
                     }).eq('id', comissao_id).execute()
                     
-                    # Adicionar observação ao objeto comissão para o e-mail
+                    # Adicionar observação ao objeto comissão para o e-mail (apenas em memória)
                     if observacao_comissao:
                         comissao['observacoes_direcao'] = observacao_comissao
                     
@@ -291,13 +290,12 @@ class AprovacaoComissoes:
                 if observacao_comissao:
                     texto_completo = f"{motivo}\n\nObservações da Direção: {observacao_comissao}"
                 
-                # Atualizar status
+                # Atualizar status (sem observacoes_direcao pois coluna não existe)
                 self.supabase.table('sienge_comissoes').update({
                     'status_aprovacao': self.STATUS_REJEITADA,
                     'data_aprovacao': datetime.now().isoformat(),
                     'aprovado_por': usuario_id,
-                    'observacoes': texto_completo,
-                    'observacoes_direcao': observacao_comissao
+                    'observacoes': texto_completo
                 }).eq('id', comissao_id).execute()
                 
                 # Registrar no histórico (opcional)

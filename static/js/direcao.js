@@ -46,18 +46,23 @@ function showAlert(message, type = 'info') {
 }
 
 function corrigirEspacamentoNome(nome) {
-    if (!nome) return '-';
+    if (!nome || nome === 'undefined' || nome === 'null') return '-';
+    const nomeStr = String(nome);
     // Adiciona espaço antes de letras maiúsculas que seguem letras minúsculas
-    return nome.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return nomeStr.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
 function getInitials(nome) {
-    if (!nome) return '?';
-    const parts = corrigirEspacamentoNome(nome).split(' ');
+    if (!nome || nome === 'undefined' || nome === 'null') return '?';
+    const nomeStr = String(nome);
+    const parts = corrigirEspacamentoNome(nomeStr).split(' ').filter(p => p && p !== 'undefined');
+    if (parts.length === 0) return '?';
     if (parts.length >= 2) {
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        const first = parts[0][0] || '?';
+        const last = parts[parts.length - 1][0] || '?';
+        return (first + last).toUpperCase();
     }
-    return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0].substring(0, 2) || '?').toUpperCase();
 }
 
 // ==================== CARREGAR COMISSÕES ====================
@@ -135,6 +140,7 @@ function renderizarTabelaComissoesDirecao(comissoes) {
         const gatilhoText = atingiuGatilho ? 'SIM' : 'NÃO';
         const nomeCorretor = corrigirEspacamentoNome(comissao.broker_nome);
         const initials = getInitials(comissao.broker_nome);
+        const valorGatilho = comissao.valor_gatilho || 0;
         
         return `
             <tr style="animation: fadeInRow 0.3s ease ${index * 0.05}s both;">
@@ -157,6 +163,7 @@ function renderizarTabelaComissoesDirecao(comissoes) {
                 <td>${comissao.unit_name || '-'}</td>
                 <td>${corrigirEspacamentoNome(comissao.customer_name)}</td>
                 <td class="valor-cell">${formatCurrency(comissao.valor_comissao || comissao.commission_value)}</td>
+                <td style="color: #888;">${formatCurrency(valorGatilho)}</td>
                 <td><span class="gatilho-badge ${gatilhoClass}">${gatilhoText}</span></td>
                 <td>${formatDate(comissao.data_envio_aprovacao)}</td>
                 <td style="text-align: center;">
