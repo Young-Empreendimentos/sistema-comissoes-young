@@ -536,11 +536,6 @@ async function carregarStatusParcela() {
                 }
             });
             
-            // Garantir que "Cancelado" sempre apareça como opção
-            if (!statusMap.has('Cancelado')) {
-                statusMap.set('Cancelado', 'Cancelled');
-            }
-            
             // Ordenar e adicionar as opções únicas
             const statusOrdenados = Array.from(statusMap.entries()).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
             
