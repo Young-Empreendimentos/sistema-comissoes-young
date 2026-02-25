@@ -578,11 +578,11 @@ def listar_corretores_filtro():
     try:
         sync = SiengeSupabaseSync()
         # Buscar corretores únicos das comissões
-        response = sync.supabase.table('sienge_comissoes').select('broker_name').execute()
+        response = sync.supabase.table('sienge_comissoes').select('broker_nome').execute()
         
         corretores_set = set()
         for c in response.data:
-            nome = c.get('broker_name')
+            nome = c.get('broker_nome')
             if nome and nome.strip():
                 corretores_set.add(nome.strip())
         
@@ -1488,8 +1488,8 @@ def listar_todas_comissoes():
 
         # Filtrar por corretor (comparação exata pelo nome)
         if corretor_param:
-            comissoes = [c for c in comissoes 
-                         if (c.get('broker_name') or '').strip() == corretor_param.strip()]
+            comissoes = [c for c in comissoes
+                         if (c.get('broker_nome') or '').strip() == corretor_param.strip()]
 
         # Mapeamento de status PT-BR -> EN
         mapa_status_parcela = {
