@@ -147,6 +147,26 @@
             color: #60a5fa;
         }
 
+        .status-cancelada {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .status-vencida {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .status-aberta {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .status-liberada {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
         .loading-corretor {
             text-align: center;
             padding: 3rem;
@@ -265,11 +285,24 @@
             setTimeout(() => alert.remove(), 4000);
         }
 
-        function getStatusBadge(status) {
+        function getStatusBadge(status, statusSienge) {
             const statusLower = (status || '').toLowerCase();
+            const siengeLower = (statusSienge || '').toLowerCase();
+            
+            // Status de cancelamento
+            if (siengeLower.includes('cancel') || statusLower.includes('cancel')) {
+                return '<span class="status-badge status-cancelada">Cancelada</span>';
+            }
+            // Status de aprovação interna
             if (statusLower.includes('aprovad')) return '<span class="status-badge status-aprovada">Aprovada</span>';
-            if (statusLower.includes('pag')) return '<span class="status-badge status-paga">Paga</span>';
+            if (statusLower.includes('rejeitad')) return '<span class="status-badge status-cancelada">Rejeitada</span>';
+            if (statusLower.includes('pag') || siengeLower.includes('paid')) return '<span class="status-badge status-paga">Paga</span>';
             if (statusLower.includes('pendente de aprovação')) return '<span class="status-badge status-pendente">Em análise da direção</span>';
+            // Status do Sienge
+            if (siengeLower.includes('overdue') || siengeLower.includes('vencid')) return '<span class="status-badge status-vencida">Vencida</span>';
+            if (siengeLower.includes('open') || siengeLower.includes('aberto')) return '<span class="status-badge status-aberta">Aberto</span>';
+            if (siengeLower.includes('awaiting') || siengeLower.includes('aguard')) return '<span class="status-badge status-pendente">Aguardando Autorização</span>';
+            if (siengeLower.includes('released') || siengeLower.includes('liberad')) return '<span class="status-badge status-liberada">Liberado</span>';
             return '<span class="status-badge status-pendente">Aguardando liberação</span>';
         }
 
@@ -337,7 +370,7 @@
                             </div>
                             <div class="contrato-info-item">
                                 <div class="contrato-info-label">Status</div>
-                                <div class="contrato-info-value">${getStatusBadge(c.status_aprovacao || c.installment_status)}</div>
+                                <div class="contrato-info-value">${getStatusBadge(c.status_aprovacao, c.installment_status)}</div>
                             </div>
                         </div>
                     </div>

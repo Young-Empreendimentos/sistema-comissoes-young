@@ -539,7 +539,7 @@ class AprovacaoComissoes:
         return html
     
     def listar_comissoes_por_status(self, status: Optional[str] = None, gatilho_atingido: Optional[bool] = None) -> List[Dict]:
-        """Lista comissões com filtros opcionais (exclui canceladas)"""
+        """Lista comissões com filtros opcionais (incluindo canceladas)"""
         try:
             query = self.supabase.table('sienge_comissoes').select('*')
             
@@ -550,11 +550,7 @@ class AprovacaoComissoes:
                 query = query.eq('atingiu_gatilho', gatilho_atingido)
             
             response = query.execute()
-            
-            # Filtrar comissões canceladas (pagas devem aparecer com status Aprovada)
             comissoes = response.data if response.data else []
-            comissoes = [c for c in comissoes 
-                         if 'CANCEL' not in (c.get('installment_status') or '').upper()]
             
             # Ordenar manualmente por data
             comissoes.sort(key=lambda x: x.get('commission_date') or '', reverse=True)

@@ -1229,13 +1229,10 @@ def relatorio_comissoes():
         
         print(f"[API Relatório] Filtros - empreendimentos: {empreendimento_list}, corretores: {corretor_list}, regras: {regra_list}, auditorias: {auditoria_list}, data: {data_inicio} a {data_fim}")
         
-        # Buscar todas as comissões
+        # Buscar todas as comissões (incluindo canceladas)
         query = sync.supabase.table('sienge_comissoes').select('*')
-        
-        # Filtrar apenas cancelados (pagas devem aparecer)
         result = query.execute()
-        comissoes = [c for c in (result.data or []) 
-                     if 'cancel' not in (c.get('installment_status') or '').lower()]
+        comissoes = result.data or []
         
         # Aplicar filtros (multi-select)
         if empreendimento_list:
@@ -1455,13 +1452,10 @@ def listar_todas_comissoes():
         
         print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}")
         
-        # Buscar comissões
+        # Buscar comissões (incluindo canceladas)
         result = sync.supabase.table('sienge_comissoes').select('*').execute()
         comissoes = result.data if result.data else []
-        
-        comissoes = [c for c in comissoes 
-                     if 'CANCEL' not in (c.get('installment_status') or '').upper()]
-        
+
         # Mapeamento de status PT-BR -> EN
         mapa_status_parcela = {
             'pago': ['paidout', 'paid out', 'paid', 'pago'],
