@@ -140,7 +140,12 @@ function corrigirEspacamentoNome(nome) {
     return nome.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
-function traduzirStatusParcela(status) {
+function traduzirStatusParcela(status, customerSituationType) {
+    // Se customer_situation_type é 'cancelled', mostrar como Distrato
+    if (customerSituationType && customerSituationType.toLowerCase() === 'cancelled') {
+        return 'Distrato';
+    }
+    
     if (!status) return 'Não informado';
     
     const statusLower = status.toLowerCase().trim().replace(/_/g, ' ');
@@ -172,6 +177,8 @@ function traduzirStatusParcela(status) {
         'cancelled': 'Cancelado',
         'canceled': 'Cancelado',
         'cancelado': 'Cancelado',
+        // Distrato
+        'distrato': 'Distrato',
         // Ativo
         'active': 'Ativo',
         'ativo': 'Ativo',
@@ -485,7 +492,7 @@ async function setupCorretorPage() {
                             </div>
                             <div class="detail-item">
                                 <div class="detail-label">Status</div>
-                                <div class="detail-value">${traduzirStatusParcela(c.installment_status || c.status_parcela)}</div>
+                                <div class="detail-value">${traduzirStatusParcela(c.installment_status || c.status_parcela, c.customer_situation_type)}</div>
                             </div>
                             <div class="detail-item">
                                 <div class="detail-label">Gatilho</div>
@@ -776,7 +783,7 @@ function renderizarTabelaComissoes(comissoes) {
                                onchange="toggleComissaoSelecionada(this)">
                     ` : ''}
                 </td>
-                <td><span class="badge-status ${getStatusParcelaClass(c.installment_status)}">${traduzirStatusParcela(c.installment_status)}</span></td>
+                <td><span class="badge-status ${getStatusParcelaClass(c.installment_status, c.customer_situation_type)}">${traduzirStatusParcela(c.installment_status, c.customer_situation_type)}</span></td>
                 <td>${corrigirEspacamentoNome(c.broker_nome)}</td>
                 <td>${c.enterprise_name || '-'}</td>
                 <td>${c.unit_name || '-'}</td>
@@ -1014,7 +1021,7 @@ function renderizarTabelaComissoesGerenciar(comissoes) {
         
         return `
             <tr id="linha-comissao-ger-${c.id}">
-                <td><span class="badge-status ${getStatusParcelaClass(c.installment_status)}">${traduzirStatusParcela(c.installment_status)}</span></td>
+                <td><span class="badge-status ${getStatusParcelaClass(c.installment_status, c.customer_situation_type)}">${traduzirStatusParcela(c.installment_status, c.customer_situation_type)}</span></td>
                 <td>${corrigirEspacamentoNome(c.broker_nome)}</td>
                 <td>${c.enterprise_name || '-'}</td>
                 <td>${c.unit_name || '-'}</td>
@@ -1117,10 +1124,15 @@ function limparFiltrosComissoesGer() {
     if (dataFim) dataFim.value = '';
 }
 
-function getStatusParcelaClass(status) {
+function getStatusParcelaClass(status, customerSituationType) {
+    // Se customer_situation_type é 'cancelled', é distrato (roxo/purple)
+    if (customerSituationType && customerSituationType.toLowerCase() === 'cancelled') {
+        return 'badge-distrato';
+    }
+    
     if (!status) return 'badge-info';
     const s = status.toLowerCase();
-    
+
     // Sucesso (verde)
     if (s.includes('paid') || s.includes('pago') || s.includes('conclu') || s.includes('settled') || s.includes('liquidado') || s.includes('done') || s.includes('finalizado')) {
         return 'badge-success';
@@ -1128,6 +1140,10 @@ function getStatusParcelaClass(status) {
     // Perigo (vermelho)
     if (s.includes('overdue') || s.includes('vencido') || s.includes('expired') || s.includes('late') || s.includes('atrasado') || s.includes('cancel') || s.includes('rejected') || s.includes('rejeitado') || s.includes('denied') || s.includes('negado')) {
         return 'badge-danger';
+    }
+    // Distrato (roxo)
+    if (s.includes('distrato')) {
+        return 'badge-distrato';
     }
     // Aviso (amarelo/laranja)
     if (s.includes('pending') || s.includes('pendente') || s.includes('aguard') || s.includes('waiting') || s.includes('partial') || s.includes('parcial') || s.includes('processing') || s.includes('progress')) {
@@ -1137,7 +1153,7 @@ function getStatusParcelaClass(status) {
     if (s.includes('open') || s.includes('aberto') || s.includes('active') || s.includes('ativo') || s.includes('due') || s.includes('vencer') || s.includes('scheduled') || s.includes('agendado')) {
         return 'badge-info';
     }
-    
+
     return 'badge-secondary';
 }
 

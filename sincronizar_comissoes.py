@@ -67,6 +67,7 @@ def sincronizar_comissoes():
                 'unit_name': commission.get('unitName'),
                 'commission_value': commission.get('value') or commission.get('commissionValue'),
                 'installment_status': commission.get('installmentStatus'),
+                'customer_situation_type': commission.get('customerSituationType'),
                 'commission_date': commission.get('dueDate') or commission.get('commissionDate'),
                 'atualizado_em': datetime.now().isoformat()
             }
