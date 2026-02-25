@@ -38,7 +38,7 @@ def sincronizar_comissoes():
     # 3. Processar e inserir/atualizar
     print("\n[3/3] Processando comissoes...")
     
-    ids_processados = set()
+    chaves_processadas = set()
     novos = 0
     atualizados = 0
     erros = 0
@@ -47,20 +47,23 @@ def sincronizar_comissoes():
         try:
             # O campo correto e commissionID
             sienge_id = commission.get('commissionID') or commission.get('id') or commission.get('commissionId')
+            broker_id = commission.get('brokerID') or commission.get('brokerId')
             if not sienge_id:
                 continue
             
-            if sienge_id in ids_processados:
+            # Chave unica: sienge_id + broker_id (para suportar multiplos corretores no mesmo contrato)
+            chave_unica = f"{sienge_id}_{broker_id}"
+            if chave_unica in chaves_processadas:
                 continue
             
-            ids_processados.add(sienge_id)
+            chaves_processadas.add(chave_unica)
             
             data = {
                 'sienge_id': str(sienge_id),
                 'numero_contrato': str(commission.get('salesContractNumber') or commission.get('contractNumber')) if (commission.get('salesContractNumber') or commission.get('contractNumber')) else None,
                 'building_id': commission.get('enterpriseID') or commission.get('enterpriseId'),
                 'company_id': str(commission.get('companyId')) if commission.get('companyId') else None,
-                'broker_id': commission.get('brokerID') or commission.get('brokerId'),
+                'broker_id': broker_id,
                 'broker_nome': commission.get('brokerName'),
                 'customer_name': commission.get('customerName'),
                 'enterprise_name': commission.get('enterpriseName'),
@@ -72,8 +75,11 @@ def sincronizar_comissoes():
                 'atualizado_em': datetime.now().isoformat()
             }
             
-            if sienge_id in existentes:
-                supabase.table('sienge_comissoes').update(data).eq('sienge_id', str(sienge_id)).execute()
+            # Verificar se ja existe no banco por sienge_id E broker_id
+            existe = supabase.table('sienge_comissoes').select('id').eq('sienge_id', str(sienge_id)).eq('broker_id', broker_id).execute()
+            
+            if existe.data:
+                supabase.table('sienge_comissoes').update(data).eq('sienge_id', str(sienge_id)).eq('broker_id', broker_id).execute()
                 atualizados += 1
             else:
                 data['status_aprovacao'] = 'Pendente'
@@ -89,7 +95,7 @@ def sincronizar_comissoes():
     print("\n" + "=" * 60)
     print("RESULTADO")
     print("=" * 60)
-    print(f"Total processado: {len(ids_processados)} comissoes unicas")
+    print(f"Total processado: {len(chaves_processadas)} comissoes unicas")
     print(f"Novas inseridas:  {novos}")
     print(f"Atualizadas:      {atualizados}")
     print(f"Erros:            {erros}")
