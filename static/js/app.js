@@ -691,19 +691,13 @@ async function buscarComissoes() {
         const statusParcela = getMultiSelectValues('statusParcela');
         const gatilhoAtingido = getMultiSelectValues('gatilho');
         const statusAprovacao = getMultiSelectValues('statusAprovacao');
-        const dataInicio = document.getElementById('filtroDataInicio')?.value || '';
-        const dataFim = document.getElementById('filtroDataFim')?.value || '';
         const corretor = document.getElementById('filtroCorretor')?.value || '';
-        const contrato = document.getElementById('filtroContrato')?.value || '';
         
         let url = '/api/comissoes/listar?';
         if (statusParcela.length > 0) url += `status_parcela=${statusParcela.join(',')}&`;
         if (gatilhoAtingido.length > 0) url += `gatilho_atingido=${gatilhoAtingido.join(',')}&`;
         if (statusAprovacao.length > 0) url += `status_aprovacao=${statusAprovacao.join(',')}&`;
-        if (dataInicio) url += `data_inicio=${dataInicio}&`;
-        if (dataFim) url += `data_fim=${dataFim}&`;
         if (corretor) url += `corretor=${encodeURIComponent(corretor)}&`;
-        if (contrato) url += `contrato=${encodeURIComponent(contrato)}&`;
         
         const response = await fetchComRetry(url);
         
@@ -1319,19 +1313,9 @@ function limparFiltrosComissoes() {
     clearMultiSelect('gatilho');
     clearMultiSelect('statusAprovacao');
 
-    // Limpar campos de data
-    const dataInicio = document.getElementById('filtroDataInicio');
-    const dataFim = document.getElementById('filtroDataFim');
-    if (dataInicio) dataInicio.value = '';
-    if (dataFim) dataFim.value = '';
-
     // Limpar filtro de corretor
     const filtroCorretor = document.getElementById('filtroCorretor');
     if (filtroCorretor) filtroCorretor.value = '';
-
-    // Limpar filtro de contrato
-    const filtroContrato = document.getElementById('filtroContrato');
-    if (filtroContrato) filtroContrato.value = '';
 
     buscarComissoes();
 }

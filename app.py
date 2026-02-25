@@ -1486,15 +1486,10 @@ def listar_todas_comissoes():
         comissoes = [c for c in comissoes
                      if 'CANCEL' not in (c.get('installment_status') or '').upper()]
 
-        # Filtrar por corretor
+        # Filtrar por corretor (comparação exata pelo nome)
         if corretor_param:
             comissoes = [c for c in comissoes 
-                         if corretor_param.lower() in (c.get('broker_name') or '').lower()]
-        
-        # Filtrar por número do contrato
-        if contrato_param:
-            comissoes = [c for c in comissoes 
-                         if contrato_param in str(c.get('numero_contrato') or '')]
+                         if (c.get('broker_name') or '').strip() == corretor_param.strip()]
 
         # Mapeamento de status PT-BR -> EN
         mapa_status_parcela = {
