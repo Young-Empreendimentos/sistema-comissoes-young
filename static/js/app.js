@@ -809,11 +809,16 @@ function renderizarTabelaComissoes(comissoes) {
 function gerarDropdownRegras(comissaoId, regraIdAtual, regraTextoAtual) {
     let options = `<option value="">Padrão (10% + ITBI)</option>`;
     
-    regrasGatilhoDisponiveis.forEach(regra => {
-        const selected = regra.id === regraIdAtual ? 'selected' : '';
-        const nomeRegra = regra.nome || `${regra.percentual}%${regra.inclui_itbi ? ' + ITBI' : ''}`;
-        options += `<option value="${regra.id}" ${selected}>${nomeRegra}</option>`;
-    });
+    if (regrasGatilhoDisponiveis && Array.isArray(regrasGatilhoDisponiveis)) {
+        regrasGatilhoDisponiveis.forEach(regra => {
+            if (!regra) return;
+            const selected = regra.id === regraIdAtual ? 'selected' : '';
+            const percentual = regra.percentual !== undefined ? regra.percentual : '10';
+            const incluiItbi = regra.inclui_itbi ? ' + ITBI' : '';
+            const nomeRegra = regra.nome || `${percentual}%${incluiItbi}`;
+            options += `<option value="${regra.id}" ${selected}>${nomeRegra}</option>`;
+        });
+    }
     
     return `
         <select 

@@ -930,6 +930,18 @@ input[type="checkbox"]:focus-visible {
     -webkit-backdrop-filter: blur(8px);
 }
 
+.tabela-comissoes thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: linear-gradient(135deg, rgba(254, 80, 9, 1), rgba(117, 25, 0, 1));
+}
+
+.tabela-comissoes tbody {
+    position: relative;
+    z-index: 1;
+}
+
 .tabela-comissoes th {
     color: white;
     font-weight: var(--font-weight-semibold);
