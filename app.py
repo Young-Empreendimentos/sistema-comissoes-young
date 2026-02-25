@@ -571,6 +571,29 @@ def listar_corretores_usuarios():
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 
+@app.route('/api/corretores/lista', methods=['GET'])
+@login_required
+def listar_corretores_filtro():
+    """Lista corretores únicos das comissões para uso nos filtros"""
+    try:
+        sync = SiengeSupabaseSync()
+        # Buscar corretores únicos das comissões
+        response = sync.supabase.table('sienge_comissoes').select('broker_name').execute()
+        
+        corretores_set = set()
+        for c in response.data:
+            nome = c.get('broker_name')
+            if nome and nome.strip():
+                corretores_set.add(nome.strip())
+        
+        corretores = [{'nome': nome} for nome in sorted(corretores_set)]
+        
+        return jsonify({'sucesso': True, 'corretores': corretores}), 200
+    except Exception as e:
+        print(f"[API] Erro ao listar corretores para filtro: {str(e)}")
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
 @app.route('/api/corretor/buscar-por-documento', methods=['GET'])
 def buscar_corretor_por_documento():
     """Busca corretor pelo CPF ou CNPJ na tabela sienge_corretores"""
@@ -1446,12 +1469,14 @@ def listar_todas_comissoes():
         gatilho_atingido_param = request.args.get('gatilho_atingido', '')
         data_inicio = request.args.get('data_inicio', '')
         data_fim = request.args.get('data_fim', '')
+        corretor_param = request.args.get('corretor', '')
+        contrato_param = request.args.get('contrato', '')
         
         status_parcela_list = [s.strip() for s in status_parcela_param.split(',') if s.strip()]
         status_aprovacao_list = [s.strip() for s in status_aprovacao_param.split(',') if s.strip()]
         gatilho_list = [s.strip() for s in gatilho_atingido_param.split(',') if s.strip()]
         
-        print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}")
+        print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, corretor: {corretor_param}, contrato: {contrato_param}")
         
         # Buscar comissões (excluindo canceladas)
         result = sync.supabase.table('sienge_comissoes').select('*').execute()
@@ -1460,6 +1485,16 @@ def listar_todas_comissoes():
         # Filtrar comissões canceladas
         comissoes = [c for c in comissoes
                      if 'CANCEL' not in (c.get('installment_status') or '').upper()]
+
+        # Filtrar por corretor
+        if corretor_param:
+            comissoes = [c for c in comissoes 
+                         if corretor_param.lower() in (c.get('broker_name') or '').lower()]
+        
+        # Filtrar por número do contrato
+        if contrato_param:
+            comissoes = [c for c in comissoes 
+                         if contrato_param in str(c.get('numero_contrato') or '')]
 
         # Mapeamento de status PT-BR -> EN
         mapa_status_parcela = {

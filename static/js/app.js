@@ -693,6 +693,8 @@ async function buscarComissoes() {
         const statusAprovacao = getMultiSelectValues('statusAprovacao');
         const dataInicio = document.getElementById('filtroDataInicio')?.value || '';
         const dataFim = document.getElementById('filtroDataFim')?.value || '';
+        const corretor = document.getElementById('filtroCorretor')?.value || '';
+        const contrato = document.getElementById('filtroContrato')?.value || '';
         
         let url = '/api/comissoes/listar?';
         if (statusParcela.length > 0) url += `status_parcela=${statusParcela.join(',')}&`;
@@ -700,6 +702,8 @@ async function buscarComissoes() {
         if (statusAprovacao.length > 0) url += `status_aprovacao=${statusAprovacao.join(',')}&`;
         if (dataInicio) url += `data_inicio=${dataInicio}&`;
         if (dataFim) url += `data_fim=${dataFim}&`;
+        if (corretor) url += `corretor=${encodeURIComponent(corretor)}&`;
+        if (contrato) url += `contrato=${encodeURIComponent(contrato)}&`;
         
         const response = await fetchComRetry(url);
         
@@ -1314,14 +1318,52 @@ function limparFiltrosComissoes() {
     clearMultiSelect('statusParcela');
     clearMultiSelect('gatilho');
     clearMultiSelect('statusAprovacao');
-    
+
     // Limpar campos de data
     const dataInicio = document.getElementById('filtroDataInicio');
     const dataFim = document.getElementById('filtroDataFim');
     if (dataInicio) dataInicio.value = '';
     if (dataFim) dataFim.value = '';
-    
+
+    // Limpar filtro de corretor
+    const filtroCorretor = document.getElementById('filtroCorretor');
+    if (filtroCorretor) filtroCorretor.value = '';
+
+    // Limpar filtro de contrato
+    const filtroContrato = document.getElementById('filtroContrato');
+    if (filtroContrato) filtroContrato.value = '';
+
     buscarComissoes();
+}
+
+// Carregar lista de corretores no filtro
+async function carregarCorretoresFiltro() {
+    try {
+        const response = await fetch('/api/corretores/lista');
+        const data = await response.json();
+        
+        const select = document.getElementById('filtroCorretor');
+        if (!select) return;
+        
+        // Manter opção "Todos"
+        select.innerHTML = '<option value="">Todos</option>';
+        
+        if (data.sucesso && data.corretores) {
+            // Ordenar corretores por nome
+            const corretores = data.corretores.sort((a, b) => 
+                (a.nome || '').localeCompare(b.nome || '')
+            );
+            
+            corretores.forEach(corretor => {
+                const option = document.createElement('option');
+                option.value = corretor.nome;
+                option.textContent = corretor.nome;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar corretores:', error);
+    }
 }
 
 // ================================
@@ -2249,7 +2291,8 @@ async function inicializarSistema() {
         await Promise.allSettled([
             setupEmpreendimentoPage().catch(e => console.warn('Erro ao setup empreendimento:', e)),
             setupCorretorPage().catch(e => console.warn('Erro ao setup corretor:', e)),
-            carregarStatusParcela().catch(e => console.warn('Erro ao carregar status parcela:', e))
+            carregarStatusParcela().catch(e => console.warn('Erro ao carregar status parcela:', e)),
+            carregarCorretoresFiltro().catch(e => console.warn('Erro ao carregar corretores filtro:', e))
         ]);
         
         console.log('Sistema de Comissoes Young inicializado!');
