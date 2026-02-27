@@ -692,12 +692,16 @@ async function buscarComissoes() {
         const gatilhoAtingido = getMultiSelectValues('gatilho');
         const statusAprovacao = getMultiSelectValues('statusAprovacao');
         const corretor = document.getElementById('filtroCorretor')?.value || '';
+        const dataComissaoInicio = document.getElementById('filtroDataComissaoInicio')?.value || '';
+        const dataComissaoFim = document.getElementById('filtroDataComissaoFim')?.value || '';
         
         let url = '/api/comissoes/listar?';
         if (statusParcela.length > 0) url += `status_parcela=${statusParcela.join(',')}&`;
         if (gatilhoAtingido.length > 0) url += `gatilho_atingido=${gatilhoAtingido.join(',')}&`;
         if (statusAprovacao.length > 0) url += `status_aprovacao=${statusAprovacao.join(',')}&`;
         if (corretor) url += `corretor=${encodeURIComponent(corretor)}&`;
+        if (dataComissaoInicio) url += `data_comissao_inicio=${dataComissaoInicio}&`;
+        if (dataComissaoFim) url += `data_comissao_fim=${dataComissaoFim}&`;
         
         const response = await fetchComRetry(url);
         
@@ -778,6 +782,8 @@ function renderizarTabelaComissoes(comissoes) {
                         <input type="checkbox" 
                                class="checkbox-comissao" 
                                data-id="${c.id}"
+                               data-valor-a-vista="${c.valor_a_vista || 0}"
+                               data-valor-comissao="${c.valor_comissao || c.commission_value || 0}"
                                onchange="toggleComissaoSelecionada(this)">
                     ` : ''}
                 </td>
@@ -787,6 +793,7 @@ function renderizarTabelaComissoes(comissoes) {
                 <td>${c.unit_name || '-'}</td>
                 <td>${formatDate(c.data_contrato)}</td>
                 <td>${corrigirEspacamentoNome(c.customer_name)}</td>
+                <td>${formatCurrency(c.valor_a_vista || 0)}</td>
                 <td>${formatCurrency(c.valor_comissao || c.commission_value)}</td>
                 <td>${formatCurrency(c.valor_pago || 0)}</td>
                 <td>${dropdownRegras}</td>
@@ -1199,12 +1206,26 @@ function toggleTodasComissoes() {
 function atualizarAcoesLote() {
     const acoesLote = document.getElementById('acoesLote');
     const qtdSelecionadas = document.getElementById('qtdSelecionadas');
-    
+    const somaValorAVista = document.getElementById('somaValorAVista');
+    const somaComissoes = document.getElementById('somaComissoes');
+
     if (!acoesLote) return;
-    
+
     if (comissoesSelecionadas.length > 0) {
         acoesLote.classList.remove('hidden');
         if (qtdSelecionadas) qtdSelecionadas.textContent = comissoesSelecionadas.length;
+        
+        // Calcular somatórios
+        let totalValorAVista = 0;
+        let totalComissoes = 0;
+        
+        document.querySelectorAll('.checkbox-comissao:checked').forEach(cb => {
+            totalValorAVista += parseFloat(cb.dataset.valorAVista || 0);
+            totalComissoes += parseFloat(cb.dataset.valorComissao || 0);
+        });
+        
+        if (somaValorAVista) somaValorAVista.textContent = formatCurrency(totalValorAVista);
+        if (somaComissoes) somaComissoes.textContent = formatCurrency(totalComissoes);
     } else {
         acoesLote.classList.add('hidden');
     }
@@ -1316,6 +1337,12 @@ function limparFiltrosComissoes() {
     // Limpar filtro de corretor
     const filtroCorretor = document.getElementById('filtroCorretor');
     if (filtroCorretor) filtroCorretor.value = '';
+
+    // Limpar filtros de data da comissão
+    const dataComissaoInicio = document.getElementById('filtroDataComissaoInicio');
+    const dataComissaoFim = document.getElementById('filtroDataComissaoFim');
+    if (dataComissaoInicio) dataComissaoInicio.value = '';
+    if (dataComissaoFim) dataComissaoFim.value = '';
 
     buscarComissoes();
 }

@@ -1541,12 +1541,14 @@ def listar_todas_comissoes():
         data_fim = request.args.get('data_fim', '')
         corretor_param = request.args.get('corretor', '')
         contrato_param = request.args.get('contrato', '')
+        data_comissao_inicio = request.args.get('data_comissao_inicio', '')
+        data_comissao_fim = request.args.get('data_comissao_fim', '')
         
         status_parcela_list = [s.strip() for s in status_parcela_param.split(',') if s.strip()]
         status_aprovacao_list = [s.strip() for s in status_aprovacao_param.split(',') if s.strip()]
         gatilho_list = [s.strip() for s in gatilho_atingido_param.split(',') if s.strip()]
         
-        print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, corretor: {corretor_param}, contrato: {contrato_param}")
+        print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, corretor: {corretor_param}")
         
         # Buscar comissões (excluindo canceladas)
         result = sync.supabase.table('sienge_comissoes').select('*').execute()
@@ -1696,6 +1698,29 @@ def listar_todas_comissoes():
             gatilho_bools = [g.lower() == 'true' for g in gatilho_list]
             comissoes = [c for c in comissoes if c.get('atingiu_gatilho') in gatilho_bools]
             print(f"[API] Após filtro de gatilho: {len(comissoes)} comissões")
+        
+        # Filtro por período da data da comissão
+        if data_comissao_inicio or data_comissao_fim:
+            def filtrar_por_data_comissao(comissao):
+                data_comissao = comissao.get('commission_date') or comissao.get('due_date')
+                if not data_comissao:
+                    return False
+                try:
+                    if 'T' in str(data_comissao):
+                        data_str = str(data_comissao).split('T')[0]
+                    else:
+                        data_str = str(data_comissao)[:10]
+                    
+                    if data_comissao_inicio and data_str < data_comissao_inicio:
+                        return False
+                    if data_comissao_fim and data_str > data_comissao_fim:
+                        return False
+                    return True
+                except:
+                    return False
+            
+            comissoes = [c for c in comissoes if filtrar_por_data_comissao(c)]
+            print(f"[API] Após filtro de data comissão: {len(comissoes)} comissões")
         
         return jsonify({
             'sucesso': True,

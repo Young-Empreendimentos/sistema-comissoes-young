@@ -285,6 +285,16 @@
                             </select>
                         </div>
 
+                        <!-- Filtro Período Data Comissão -->
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label class="form-label">Período da Comissão</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="date" id="filtroDataComissaoInicio" class="form-input" style="flex: 1; padding: 0.65rem; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: #fff;">
+                                <span style="color: #888;">até</span>
+                                <input type="date" id="filtroDataComissaoFim" class="form-input" style="flex: 1; padding: 0.65rem; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: #fff;">
+                            </div>
+                        </div>
+
                         <!-- Botões -->
                         <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
                             <button class="btn-primary" onclick="buscarComissoes()" style="flex: 1;">Buscar</button>
@@ -293,8 +303,12 @@
                     </div>
 
                     <!-- Ações em Lote -->
-                    <div id="acoesLote" class="acoes-lote hidden" style="background: #1a1a1a; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div id="acoesLote" class="acoes-lote hidden" style="background: #1a1a1a; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                         <span><strong id="qtdSelecionadas">0</strong> comissões selecionadas</span>
+                        <span style="color: #888;">|</span>
+                        <span>Valor à Vista: <strong id="somaValorAVista" style="color: #FE5009;">R$ 0,00</strong></span>
+                        <span style="color: #888;">|</span>
+                        <span>Comissões: <strong id="somaComissoes" style="color: #4CAF50;">R$ 0,00</strong></span>
                         <button class="btn-primary" onclick="enviarParaAprovacao()">Enviar para Aprovação da Direção</button>
                     </div>
 
@@ -322,6 +336,7 @@
                                     <th style="padding: 1rem;">Lote</th>
                                     <th style="padding: 1rem;">Data Contrato</th>
                                     <th style="padding: 1rem;">Cliente</th>
+                                    <th style="padding: 1rem;">Valor à Vista</th>
                                     <th style="padding: 1rem;">Valor Comissão</th>
                                     <th style="padding: 1rem;">Valor Pago</th>
                                     <th style="padding: 1rem;">Regra</th>
@@ -332,7 +347,7 @@
                                 </tr>
                             </thead>
                             <tbody id="corpoTabelaComissoes">
-                                <tr><td colspan="14" style="text-align: center; padding: 2rem;">Clique em "Buscar" para carregar as comissões</td></tr>
+                                <tr><td colspan="15" style="text-align: center; padding: 2rem;">Clique em "Buscar" para carregar as comissões</td></tr>
                             </tbody>
                         </table>
                     </div>
