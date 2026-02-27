@@ -668,6 +668,76 @@ def contratos_por_corretor():
         sync = SiengeSupabaseSync()
         comissoes = sync.get_comissoes_por_corretor(corretor_id=corretor_id, corretor_nome=corretor_nome)
         
+        # Calcular gatilho em tempo real para cada comissão (igual ao Visualizar Comissões)
+        # Batch loading dos dados necessários
+        contratos_result = sync.supabase.table('sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total').execute()
+        contratos_map = {}
+        for ct in (contratos_result.data or []):
+            key = (str(ct.get('numero_contrato', '')), str(ct.get('building_id', '')))
+            contratos_map[key] = ct
+        
+        itbi_result = sync.supabase.table('sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
+        itbi_map = {}
+        for it in (itbi_result.data or []):
+            key = (str(it.get('numero_contrato', '')), str(it.get('building_id', '')))
+            itbi_map[key] = float(it.get('valor_itbi') or 0)
+        
+        pago_result = sync.supabase.table('sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
+        pago_map = {}
+        for pg in (pago_result.data or []):
+            key = (str(pg.get('numero_contrato', '')), str(pg.get('building_id', '')))
+            pago_map[key] = float(pg.get('valor_pago') or 0)
+        
+        regras_result = sync.supabase.table('regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
+        regras_map = {}
+        for rg in (regras_result.data or []):
+            regras_map[rg['id']] = rg
+        
+        # Calcular gatilho para cada comissão
+        for c in comissoes:
+            numero_contrato = str(c.get('numero_contrato') or '')
+            building_id = str(c.get('building_id') or '')
+            key = (numero_contrato, building_id)
+            
+            contrato = contratos_map.get(key)
+            valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
+            valor_itbi = itbi_map.get(key, 0)
+            valor_pago = pago_map.get(key, 0)
+            
+            # Determinar regra do gatilho
+            regra_gatilho_texto = '10% + ITBI'
+            percentual = None
+            inclui_itbi = None
+            
+            regra_id = c.get('regra_gatilho_id')
+            if regra_id and regra_id in regras_map:
+                regra_data = regras_map[regra_id]
+                percentual = regra_data.get('percentual')
+                inclui_itbi = regra_data.get('inclui_itbi')
+                if percentual is not None:
+                    regra_gatilho_texto = f"{percentual}% + ITBI" if inclui_itbi else f"{percentual}%"
+            
+            if percentual is None:
+                regra_texto = c.get('regra_gatilho')
+                if regra_texto:
+                    regra_gatilho_texto = regra_texto
+            
+            # Calcular valor do gatilho
+            if percentual is not None:
+                perc = float(percentual) / 100.0
+                valor_gatilho = (valor_a_vista * perc) + valor_itbi if inclui_itbi else valor_a_vista * perc
+            else:
+                valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
+            
+            atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+            
+            c['valor_pago'] = valor_pago
+            c['valor_itbi'] = valor_itbi
+            c['valor_gatilho'] = valor_gatilho
+            c['atingiu_gatilho'] = atingiu_gatilho
+            c['valor_a_vista'] = valor_a_vista
+            c['regra_gatilho'] = regra_gatilho_texto
+        
         return jsonify(comissoes), 200
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
