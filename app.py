@@ -1500,6 +1500,7 @@ def listar_todas_comissoes():
             'parcial': ['partial', 'parcial'],
             'cancelado': ['cancelled', 'canceled', 'cancelado'],
             'aguardando autorização': ['awaiting authorization', 'awaiting_authorization', 'aguardando autorização'],
+            'aguardando liberação': ['awaiting release', 'awaiting_release', 'aguardando liberação'],
             'liberado': ['released', 'liberado']
         }
         
