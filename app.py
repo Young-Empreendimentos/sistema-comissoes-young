@@ -700,9 +700,18 @@ def contratos_por_corretor():
             key = (numero_contrato, building_id)
             
             contrato = contratos_map.get(key)
-            valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
             valor_itbi = itbi_map.get(key, 0)
             valor_pago = pago_map.get(key, 0)
+            
+            # Calcular valor_a_vista (valor base do contrato) a partir da comissão
+            # Fórmula: valor_comissao / (percentual / 100)
+            valor_comissao = float(c.get('valor_comissao') or c.get('commission_value') or 0)
+            percentual_comissao = float(c.get('percentual') or c.get('installment_percentage') or 0)
+            if percentual_comissao > 0:
+                valor_a_vista = valor_comissao / (percentual_comissao / 100)
+            else:
+                # Fallback para o contrato se não tiver percentual
+                valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
             
             # Determinar regra do gatilho
             regra_gatilho_texto = '10% + ITBI'
@@ -1632,10 +1641,19 @@ def listar_todas_comissoes():
             key = (numero_contrato, building_id)
             
             contrato = contratos_map.get(key)
-            valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
             valor_itbi = itbi_map.get(key, 0)
             valor_pago = pago_map.get(key, 0)
             c['data_contrato'] = contrato.get('data_contrato') if contrato else None
+            
+            # Calcular valor_a_vista (valor base do contrato) a partir da comissão
+            # Fórmula: valor_comissao / (percentual / 100)
+            valor_comissao = float(c.get('valor_comissao') or c.get('commission_value') or 0)
+            percentual_comissao = float(c.get('percentual') or c.get('installment_percentage') or 0)
+            if percentual_comissao > 0:
+                valor_a_vista = valor_comissao / (percentual_comissao / 100)
+            else:
+                # Fallback para o contrato se não tiver percentual
+                valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
             
             # Determinar regra do gatilho
             regra_gatilho_texto = '10% + ITBI'
