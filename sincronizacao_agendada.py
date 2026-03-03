@@ -224,6 +224,61 @@ def sincronizar_itbis():
         return {'sucesso': False, 'erro': str(e)}
 
 
+def sincronizar_base_value():
+    """Sincroniza o baseValue (valor a vista) das comissões"""
+    log("Iniciando sincronizacao de BASE VALUE (valor a vista)...")
+    
+    import time
+    
+    try:
+        # Buscar todas as comissões do banco
+        result = supabase.table('sienge_comissoes').select('id,sienge_id,numero_contrato').execute()
+        comissoes = result.data or []
+        total = len(comissoes)
+        log(f"  {total} comissoes para buscar baseValue")
+        
+        atualizados = 0
+        erros = 0
+        
+        for i, c in enumerate(comissoes):
+            sienge_id = c.get('sienge_id')
+            if not sienge_id:
+                continue
+            
+            try:
+                # Buscar detalhes da comissão
+                detalhe = sienge_client.get_commission_details(int(sienge_id))
+                
+                if detalhe and 'baseValue' in detalhe:
+                    base_value = detalhe.get('baseValue')
+                    
+                    # Atualizar no banco
+                    supabase.table('sienge_comissoes').update({
+                        'valor_comissao': base_value,
+                        'atualizado_em': datetime.now().isoformat()
+                    }).eq('id', c['id']).execute()
+                    
+                    atualizados += 1
+                else:
+                    erros += 1
+                
+                # Pequeno delay para não sobrecarregar a API
+                if i % 10 == 0:
+                    time.sleep(0.3)
+                    
+            except Exception as e:
+                erros += 1
+                if erros <= 5:
+                    log(f"  Erro baseValue comissao {sienge_id}: {str(e)[:60]}")
+        
+        log(f"BASE VALUE: {total} comissoes | {atualizados} atualizados | {erros} erros")
+        return {'sucesso': True, 'total': total, 'sincronizados': atualizados, 'erros': erros}
+        
+    except Exception as e:
+        log(f"ERRO em baseValue: {str(e)}")
+        return {'sucesso': False, 'erro': str(e)}
+
+
 def sincronizar_valores_pagos():
     """Sincroniza valores pagos de todos os contratos"""
     log("Iniciando sincronizacao de VALORES PAGOS...")
@@ -299,6 +354,9 @@ def executar_sincronizacao_completa():
     
     # 4. Sincronizar valores pagos
     resultados['valores_pagos'] = sincronizar_valores_pagos()
+    
+    # 5. Sincronizar baseValue (valor a vista) das comissões
+    resultados['base_value'] = sincronizar_base_value()
     
     fim = datetime.now()
     duracao = (fim - inicio).total_seconds() / 60
