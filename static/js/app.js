@@ -782,8 +782,8 @@ function renderizarTabelaComissoes(comissoes) {
                         <input type="checkbox" 
                                class="checkbox-comissao" 
                                data-id="${c.id}"
-                               data-valor-a-vista="${c.valor_a_vista || 0}"
-                               data-valor-comissao="${c.valor_comissao || c.commission_value || 0}"
+                               data-valor-a-vista="${c.valor_comissao || c.valor_a_vista || 0}"
+                               data-valor-comissao="${c.commission_value || 0}"
                                onchange="toggleComissaoSelecionada(this)">
                     ` : ''}
                 </td>
@@ -793,8 +793,8 @@ function renderizarTabelaComissoes(comissoes) {
                 <td>${c.unit_name || '-'}</td>
                 <td>${formatDate(c.data_contrato)}</td>
                 <td>${corrigirEspacamentoNome(c.customer_name)}</td>
-                <td>${formatCurrency(c.valor_a_vista || 0)}</td>
-                <td>${formatCurrency(c.valor_comissao || c.commission_value)}</td>
+                <td>${formatCurrency(c.valor_comissao || c.valor_a_vista || 0)}</td>
+                <td>${formatCurrency(c.commission_value || 0)}</td>
                 <td>${formatCurrency(c.valor_pago || 0)}</td>
                 <td>${dropdownRegras}</td>
                 <td id="valor-gatilho-${c.id}">${formatCurrency(c.valor_gatilho)}</td>
@@ -1032,7 +1032,7 @@ function renderizarTabelaComissoesGerenciar(comissoes) {
                 <td>${c.unit_name || '-'}</td>
                 <td>${formatDate(c.data_contrato)}</td>
                 <td>${corrigirEspacamentoNome(c.customer_name)}</td>
-                <td>${formatCurrency(c.valor_comissao || c.commission_value)}</td>
+                <td>${formatCurrency(c.commission_value || 0)}</td>
                 <td>${formatCurrency(c.valor_pago || 0)}</td>
                 <td>${dropdownRegras}</td>
                 <td id="valor-gatilho-ger-${c.id}">${formatCurrency(c.valor_gatilho)}</td>
