@@ -369,6 +369,10 @@
                                 <div class="contrato-info-value valor">${formatCurrency(c.commission_value)}</div>
                             </div>
                             <div class="contrato-info-item">
+                                <div class="contrato-info-label">Gatilho</div>
+                                <div class="contrato-info-value">${c.atingiu_gatilho ? '<span class="status-badge status-aprovada">Sim</span>' : '<span class="status-badge status-cancelada">Não</span>'}</div>
+                            </div>
+                            <div class="contrato-info-item">
                                 <div class="contrato-info-label">Status</div>
                                 <div class="contrato-info-value">${getStatusBadge(c.status_aprovacao, c.installment_status)}</div>
                             </div>
