@@ -120,9 +120,12 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_comissoes(self, building_id: int = None) -> dict:
-        """Sincroniza comissões do Sienge"""
+        """Sincroniza comissões do Sienge de todas as empresas"""
         try:
-            commissions = self.sienge.get_all_commissions_paginated(building_id=building_id)
+            if building_id:
+                commissions = self.sienge.get_all_commissions_paginated(building_id=building_id)
+            else:
+                commissions = self.sienge.get_commissions_all_companies()
             count = 0
             
             for commission in commissions:
@@ -146,6 +149,7 @@ class SiengeSupabaseSync:
                     'unit_name': commission.get('unitName'),
                     'commission_value': commission.get('value') or commission.get('commissionValue'),
                     'installment_status': commission.get('installmentStatus'),
+                    'installment_percentage': commission.get('installmentPercentage'),
                     'commission_date': commission.get('dueDate') or commission.get('commissionDate') or commission.get('date'),
                     'atualizado_em': datetime.now().isoformat()
                 }
