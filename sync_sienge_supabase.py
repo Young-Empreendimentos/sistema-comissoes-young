@@ -13,6 +13,9 @@ from sienge_client import sienge_client
 load_dotenv()
 
 
+VALID_BUILDING_IDS = {'2003', '2004', '2005', '2007', '2009', '2010', '2011', '2014'}
+
+
 class SiengeSupabaseSync:
     """Sincroniza dados do Sienge para Supabase"""
     
@@ -51,9 +54,13 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_contratos(self, building_id: int = None) -> dict:
-        """Sincroniza contratos do Sienge"""
+        """Sincroniza contratos do Sienge de todas as empresas"""
         try:
-            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
+            if building_id:
+                contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
+            else:
+                contracts = self.sienge.get_contracts_all_companies()
+                contracts = [c for c in contracts if str(c.get('enterpriseId', '')) in VALID_BUILDING_IDS]
             count = 0
             
             for contract in contracts:
@@ -175,7 +182,11 @@ class SiengeSupabaseSync:
     def sync_itbi(self, building_id: int = None) -> dict:
         """Sincroniza valores de ITBI extraindo do paymentConditions (conditionTypeId='DC')"""
         try:
-            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
+            if building_id:
+                contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
+            else:
+                contracts = self.sienge.get_contracts_all_companies()
+                contracts = [c for c in contracts if str(c.get('enterpriseId', '')) in VALID_BUILDING_IDS]
             count = 0
             erros = 0
             
@@ -227,7 +238,11 @@ class SiengeSupabaseSync:
     def sync_valores_pagos(self, building_id: int = None) -> dict:
         """Sincroniza valores pagos dos contratos extraindo do paymentConditions"""
         try:
-            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
+            if building_id:
+                contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
+            else:
+                contracts = self.sienge.get_contracts_all_companies()
+                contracts = [c for c in contracts if str(c.get('enterpriseId', '')) in VALID_BUILDING_IDS]
             count = 0
             erros = 0
             
