@@ -51,12 +51,9 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_contratos(self, building_id: int = None) -> dict:
-        """Sincroniza contratos do Sienge de todas as empresas"""
+        """Sincroniza contratos do Sienge"""
         try:
-            if building_id:
-                contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
-            else:
-                contracts = self.sienge.get_contracts_all_companies()
+            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
             count = 0
             
             for contract in contracts:
@@ -178,10 +175,7 @@ class SiengeSupabaseSync:
     def sync_itbi(self, building_id: int = None) -> dict:
         """Sincroniza valores de ITBI extraindo do paymentConditions (conditionTypeId='DC')"""
         try:
-            if building_id:
-                contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
-            else:
-                contracts = self.sienge.get_contracts_all_companies()
+            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
             count = 0
             erros = 0
             
@@ -233,10 +227,7 @@ class SiengeSupabaseSync:
     def sync_valores_pagos(self, building_id: int = None) -> dict:
         """Sincroniza valores pagos dos contratos extraindo do paymentConditions"""
         try:
-            if building_id:
-                contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
-            else:
-                contracts = self.sienge.get_contracts_all_companies()
+            contracts = self.sienge.get_all_contracts_paginated(building_id=building_id)
             count = 0
             erros = 0
             
