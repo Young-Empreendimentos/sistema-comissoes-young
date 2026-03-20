@@ -202,6 +202,7 @@ class SiengeSupabaseSync:
                         data = {
                             'numero_contrato': numero_contrato,
                             'building_id': bid,
+                            'company_id': contract.get('companyId'),
                             'valor_itbi': itbi_data['valor_itbi'],
                             'documento_sienge': itbi_data.get('documento'),
                             'data_vencimento': itbi_data.get('data_vencimento'),
@@ -258,6 +259,7 @@ class SiengeSupabaseSync:
                         data = {
                             'numero_contrato': numero_contrato,
                             'building_id': bid,
+                            'company_id': contract.get('companyId'),
                             'valor_pago': valor_pago,
                             'atualizado_em': datetime.now().isoformat()
                         }
