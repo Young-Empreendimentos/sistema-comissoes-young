@@ -699,55 +699,75 @@ def contratos_por_corretor():
             building_id = str(c.get('building_id') or '')
             key = (numero_contrato, building_id)
             
-            contrato = contratos_map.get(key)
-            valor_itbi = itbi_map.get(key, 0)
-            valor_pago = pago_map.get(key, 0)
+            # Verificar se é uma comissão manual
+            is_manual = c.get('origem') == 'manual' or numero_contrato.startswith('MANUAL-')
             
-            # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
-            valor_a_vista = float(c.get('valor_comissao') or 0)
-            
-            if valor_a_vista == 0:
-                # Fallback: calcular a partir do valor da comissão e percentual
-                commission_value = float(c.get('commission_value') or 0)
-                percentual_comissao = float(c.get('installment_percentage') or 0)
-                if percentual_comissao > 0:
-                    valor_a_vista = commission_value / (percentual_comissao / 100)
-                else:
-                    valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
-            
-            # Determinar regra do gatilho
-            regra_gatilho_texto = '10% + ITBI'
-            percentual = None
-            inclui_itbi = None
-            
-            regra_id = c.get('regra_gatilho_id')
-            if regra_id and regra_id in regras_map:
-                regra_data = regras_map[regra_id]
-                percentual = regra_data.get('percentual')
-                inclui_itbi = regra_data.get('inclui_itbi')
-                if percentual is not None:
-                    regra_gatilho_texto = f"{percentual}% + ITBI" if inclui_itbi else f"{percentual}%"
-            
-            if percentual is None:
-                regra_texto = c.get('regra_gatilho')
-                if regra_texto:
-                    regra_gatilho_texto = regra_texto
-            
-            # Calcular valor do gatilho
-            if percentual is not None:
-                perc = float(percentual) / 100.0
-                valor_gatilho = (valor_a_vista * perc) + valor_itbi if inclui_itbi else valor_a_vista * perc
+            if is_manual:
+                # Para comissões manuais, os valores já estão definidos no registro
+                valor_a_vista = float(c.get('valor_comissao') or 0)
+                valor_pago_manual = pago_map.get((numero_contrato, 'MANUAL'), 0)
+                regra_gatilho_texto = c.get('regra_gatilho') or 'Manual'
+                
+                c['valor_pago'] = valor_pago_manual
+                c['valor_itbi'] = 0
+                c['valor_a_vista'] = valor_a_vista
+                c['regra_gatilho'] = regra_gatilho_texto
+                
+                # Para comissões manuais, calcular gatilho baseado nos valores informados
+                valor_gatilho = valor_a_vista * 0.10
+                c['valor_gatilho'] = valor_gatilho
+                c['atingiu_gatilho'] = valor_pago_manual >= valor_gatilho if valor_gatilho > 0 else False
             else:
-                valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
-            
-            atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
-            
-            c['valor_pago'] = valor_pago
-            c['valor_itbi'] = valor_itbi
-            c['valor_gatilho'] = valor_gatilho
-            c['atingiu_gatilho'] = atingiu_gatilho
-            c['valor_a_vista'] = valor_a_vista
-            c['regra_gatilho'] = regra_gatilho_texto
+                # Lógica normal para comissões do SIENGE
+                contrato = contratos_map.get(key)
+                valor_itbi = itbi_map.get(key, 0)
+                valor_pago = pago_map.get(key, 0)
+                
+                # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
+                valor_a_vista = float(c.get('valor_comissao') or 0)
+                
+                if valor_a_vista == 0:
+                    # Fallback: calcular a partir do valor da comissão e percentual
+                    commission_value = float(c.get('commission_value') or 0)
+                    percentual_comissao = float(c.get('installment_percentage') or 0)
+                    if percentual_comissao > 0:
+                        valor_a_vista = commission_value / (percentual_comissao / 100)
+                    else:
+                        valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
+                
+                # Determinar regra do gatilho
+                regra_gatilho_texto = '10% + ITBI'
+                percentual = None
+                inclui_itbi = None
+                
+                regra_id = c.get('regra_gatilho_id')
+                if regra_id and regra_id in regras_map:
+                    regra_data = regras_map[regra_id]
+                    percentual = regra_data.get('percentual')
+                    inclui_itbi = regra_data.get('inclui_itbi')
+                    if percentual is not None:
+                        regra_gatilho_texto = f"{percentual}% + ITBI" if inclui_itbi else f"{percentual}%"
+                
+                if percentual is None:
+                    regra_texto = c.get('regra_gatilho')
+                    if regra_texto:
+                        regra_gatilho_texto = regra_texto
+                
+                # Calcular valor do gatilho
+                if percentual is not None:
+                    perc = float(percentual) / 100.0
+                    valor_gatilho = (valor_a_vista * perc) + valor_itbi if inclui_itbi else valor_a_vista * perc
+                else:
+                    valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
+                
+                atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                
+                c['valor_pago'] = valor_pago
+                c['valor_itbi'] = valor_itbi
+                c['valor_gatilho'] = valor_gatilho
+                c['atingiu_gatilho'] = atingiu_gatilho
+                c['valor_a_vista'] = valor_a_vista
+                c['regra_gatilho'] = regra_gatilho_texto
         
         return jsonify(comissoes), 200
     except Exception as e:
@@ -1642,56 +1662,82 @@ def listar_todas_comissoes():
             building_id = str(c.get('building_id') or '')
             key = (numero_contrato, building_id)
             
-            contrato = contratos_map.get(key)
-            valor_itbi = itbi_map.get(key, 0)
-            valor_pago = pago_map.get(key, 0)
-            c['data_contrato'] = contrato.get('data_contrato') if contrato else None
+            # Verificar se é uma comissão manual
+            is_manual = c.get('origem') == 'manual' or numero_contrato.startswith('MANUAL-')
             
-            # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
-            valor_a_vista = float(c.get('valor_comissao') or 0)
-            
-            if valor_a_vista == 0:
-                # Fallback: calcular a partir do valor da comissão e percentual
-                commission_value = float(c.get('commission_value') or 0)
-                percentual_comissao = float(c.get('installment_percentage') or 0)
-                if percentual_comissao > 0:
-                    valor_a_vista = commission_value / (percentual_comissao / 100)
-                else:
-                    valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
-            
-            # Determinar regra do gatilho
-            regra_gatilho_texto = '10% + ITBI'
-            percentual = None
-            inclui_itbi = None
-            
-            regra_id = c.get('regra_gatilho_id')
-            if regra_id and regra_id in regras_map:
-                regra_data = regras_map[regra_id]
-                percentual = regra_data.get('percentual')
-                inclui_itbi = regra_data.get('inclui_itbi')
-                if percentual is not None:
-                    regra_gatilho_texto = f"{percentual}% + ITBI" if inclui_itbi else f"{percentual}%"
-            
-            if percentual is None:
-                regra_texto = c.get('regra_gatilho')
-                if regra_texto:
-                    regra_gatilho_texto = regra_texto
-            
-            # Calcular valor do gatilho
-            if percentual is not None:
-                perc = float(percentual) / 100.0
-                valor_gatilho = (valor_a_vista * perc) + valor_itbi if inclui_itbi else valor_a_vista * perc
+            if is_manual:
+                # Para comissões manuais, os valores já estão definidos no registro
+                valor_a_vista = float(c.get('valor_comissao') or 0)
+                valor_pago_manual = pago_map.get((numero_contrato, 'MANUAL'), 0)
+                
+                # Buscar valor_gatilho do registro (pode estar em observações ou calcular do valor)
+                regra_gatilho_texto = c.get('regra_gatilho') or 'Manual'
+                
+                # Para comissões manuais, usamos o valor_pago registrado
+                c['valor_pago'] = valor_pago_manual
+                c['valor_itbi'] = 0
+                c['valor_a_vista'] = valor_a_vista
+                c['regra_gatilho'] = regra_gatilho_texto
+                c['data_contrato'] = c.get('commission_date')
+                
+                # Para comissões manuais, calcular gatilho baseado nos valores informados
+                # O valor do gatilho é calculado como 10% do valor à vista (padrão)
+                valor_gatilho = valor_a_vista * 0.10
+                c['valor_gatilho'] = valor_gatilho
+                c['atingiu_gatilho'] = valor_pago_manual >= valor_gatilho if valor_gatilho > 0 else False
+                
             else:
-                valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
-            
-            atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
-            
-            c['valor_pago'] = valor_pago
-            c['valor_itbi'] = valor_itbi
-            c['valor_gatilho'] = valor_gatilho
-            c['atingiu_gatilho'] = atingiu_gatilho
-            c['valor_a_vista'] = valor_a_vista
-            c['regra_gatilho'] = regra_gatilho_texto
+                # Lógica normal para comissões do SIENGE
+                contrato = contratos_map.get(key)
+                valor_itbi = itbi_map.get(key, 0)
+                valor_pago = pago_map.get(key, 0)
+                c['data_contrato'] = contrato.get('data_contrato') if contrato else None
+                
+                # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
+                valor_a_vista = float(c.get('valor_comissao') or 0)
+                
+                if valor_a_vista == 0:
+                    # Fallback: calcular a partir do valor da comissão e percentual
+                    commission_value = float(c.get('commission_value') or 0)
+                    percentual_comissao = float(c.get('installment_percentage') or 0)
+                    if percentual_comissao > 0:
+                        valor_a_vista = commission_value / (percentual_comissao / 100)
+                    else:
+                        valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
+                
+                # Determinar regra do gatilho
+                regra_gatilho_texto = '10% + ITBI'
+                percentual = None
+                inclui_itbi = None
+                
+                regra_id = c.get('regra_gatilho_id')
+                if regra_id and regra_id in regras_map:
+                    regra_data = regras_map[regra_id]
+                    percentual = regra_data.get('percentual')
+                    inclui_itbi = regra_data.get('inclui_itbi')
+                    if percentual is not None:
+                        regra_gatilho_texto = f"{percentual}% + ITBI" if inclui_itbi else f"{percentual}%"
+                
+                if percentual is None:
+                    regra_texto = c.get('regra_gatilho')
+                    if regra_texto:
+                        regra_gatilho_texto = regra_texto
+                
+                # Calcular valor do gatilho
+                if percentual is not None:
+                    perc = float(percentual) / 100.0
+                    valor_gatilho = (valor_a_vista * perc) + valor_itbi if inclui_itbi else valor_a_vista * perc
+                else:
+                    valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
+                
+                atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                
+                c['valor_pago'] = valor_pago
+                c['valor_itbi'] = valor_itbi
+                c['valor_gatilho'] = valor_gatilho
+                c['atingiu_gatilho'] = atingiu_gatilho
+                c['valor_a_vista'] = valor_a_vista
+                c['regra_gatilho'] = regra_gatilho_texto
         
         # Filtro de período de data do contrato
         if data_inicio or data_fim:
@@ -1751,6 +1797,92 @@ def listar_todas_comissoes():
         }), 200
         
     except Exception as e:
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
+@app.route('/api/comissoes/manual', methods=['POST'])
+@login_required
+def criar_comissao_manual():
+    """Cria uma comissão manual que não será sincronizada com o SIENGE"""
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Apenas administradores podem criar comissões manuais'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        # Validar campos obrigatórios
+        campos_obrigatorios = ['corretor_id', 'corretor_nome', 'empreendimento', 'lote', 
+                               'cliente', 'data_contrato', 'valor_a_vista', 
+                               'valor_comissao', 'valor_pago', 'valor_gatilho']
+        
+        for campo in campos_obrigatorios:
+            if campo not in data or data[campo] is None or data[campo] == '':
+                return jsonify({'sucesso': False, 'erro': f'Campo obrigatório: {campo}'}), 400
+        
+        sync = SiengeSupabaseSync()
+        
+        # Calcular se atingiu gatilho
+        valor_pago = float(data.get('valor_pago', 0))
+        valor_gatilho = float(data.get('valor_gatilho', 0))
+        atingiu_gatilho = valor_pago >= valor_gatilho if valor_gatilho > 0 else False
+        
+        # Gerar um número de contrato único para comissões manuais
+        # Formato: MANUAL-YYYYMMDD-HHMMSS
+        numero_contrato_manual = f"MANUAL-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        
+        # Criar registro na tabela sienge_comissoes
+        nova_comissao = {
+            'numero_contrato': numero_contrato_manual,
+            'broker_id': data.get('corretor_id'),
+            'broker_nome': data.get('corretor_nome'),
+            'enterprise_name': data.get('empreendimento'),
+            'building_name': data.get('empreendimento'),
+            'unit_name': data.get('lote'),
+            'customer_name': data.get('cliente'),
+            'commission_date': data.get('data_contrato'),
+            'valor_comissao': float(data.get('valor_a_vista', 0)),  # valor_comissao armazena valor à vista
+            'commission_value': float(data.get('valor_comissao', 0)),
+            'installment_status': 'Manual',  # Status especial para comissões manuais
+            'status_aprovacao': 'Pendente',
+            'regra_gatilho': data.get('regra_gatilho', 'Manual'),
+            'observacoes': data.get('observacoes', ''),
+            'origem': 'manual',  # Indica que é uma comissão manual
+            'criado_por': current_user.id,
+            'criado_em': datetime.now().isoformat()
+        }
+        
+        result = sync.supabase.table('sienge_comissoes').insert(nova_comissao).execute()
+        
+        if result.data:
+            comissao_criada = result.data[0]
+            
+            # Criar registro de valor pago se valor_pago > 0
+            if valor_pago > 0:
+                sync.supabase.table('sienge_valor_pago').insert({
+                    'numero_contrato': numero_contrato_manual,
+                    'building_id': 'MANUAL',
+                    'valor_pago': valor_pago,
+                    'atualizado_em': datetime.now().isoformat()
+                }).execute()
+            
+            print(f"[API] Comissão manual criada: {numero_contrato_manual} - Corretor: {data.get('corretor_nome')}")
+            
+            return jsonify({
+                'sucesso': True,
+                'mensagem': 'Comissão manual criada com sucesso!',
+                'comissao': {
+                    'id': comissao_criada.get('id'),
+                    'numero_contrato': numero_contrato_manual,
+                    'atingiu_gatilho': atingiu_gatilho
+                }
+            }), 201
+        
+        return jsonify({'sucesso': False, 'erro': 'Erro ao criar comissão'}), 400
+        
+    except Exception as e:
+        print(f"[API] Erro ao criar comissão manual: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 

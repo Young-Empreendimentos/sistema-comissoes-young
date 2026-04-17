@@ -2698,6 +2698,165 @@ window.sincronizarItbiFaltantes = async function() {
     }
 };
 
+// ================================
+// COMISSÃO MANUAL
+// ================================
+
+/**
+ * Abre o modal para adicionar comissão manual
+ */
+function abrirModalComissaoManual() {
+    const modal = document.getElementById('modalComissaoManual');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        // Carregar corretores no select
+        carregarCorretoresParaComissaoManual();
+        
+        // Limpar formulário
+        document.getElementById('formComissaoManual').reset();
+        document.getElementById('manualAtingiuGatilho').textContent = 'Calculado automaticamente';
+        document.getElementById('manualAtingiuGatilho').style.color = '#FE5009';
+        
+        // Adicionar listeners para calcular gatilho automaticamente
+        const valorPago = document.getElementById('manualValorPago');
+        const valorGatilho = document.getElementById('manualValorGatilho');
+        
+        const calcularAtingiuGatilho = () => {
+            const pago = parseFloat(valorPago.value) || 0;
+            const gatilho = parseFloat(valorGatilho.value) || 0;
+            const elemento = document.getElementById('manualAtingiuGatilho');
+            
+            if (gatilho > 0) {
+                if (pago >= gatilho) {
+                    elemento.textContent = 'SIM';
+                    elemento.style.color = '#4ade80';
+                } else {
+                    elemento.textContent = 'NÃO';
+                    elemento.style.color = '#ef4444';
+                }
+            } else {
+                elemento.textContent = 'Preencha os valores';
+                elemento.style.color = '#888';
+            }
+        };
+        
+        valorPago.addEventListener('input', calcularAtingiuGatilho);
+        valorGatilho.addEventListener('input', calcularAtingiuGatilho);
+    }
+}
+
+/**
+ * Fecha o modal de comissão manual
+ */
+function fecharModalComissaoManual() {
+    const modal = document.getElementById('modalComissaoManual');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+/**
+ * Carrega a lista de corretores para o select do modal
+ */
+async function carregarCorretoresParaComissaoManual() {
+    const select = document.getElementById('manualCorretor');
+    if (!select) return;
+    
+    try {
+        const response = await fetch('/api/corretores');
+        const corretores = await response.json();
+        
+        select.innerHTML = '<option value="">Selecione um corretor</option>';
+        
+        if (Array.isArray(corretores)) {
+            // Ordenar por nome
+            corretores.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+            
+            corretores.forEach(corretor => {
+                const option = document.createElement('option');
+                option.value = corretor.sienge_id || corretor.id;
+                option.textContent = corretor.nome;
+                option.dataset.nome = corretor.nome;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar corretores:', error);
+        showAlert('Erro ao carregar lista de corretores', 'error');
+    }
+}
+
+/**
+ * Salva a comissão manual
+ */
+async function salvarComissaoManual(event) {
+    event.preventDefault();
+    
+    const selectCorretor = document.getElementById('manualCorretor');
+    const corretorId = selectCorretor.value;
+    const corretorNome = selectCorretor.options[selectCorretor.selectedIndex]?.dataset?.nome || 
+                         selectCorretor.options[selectCorretor.selectedIndex]?.textContent || '';
+    
+    const dados = {
+        corretor_id: corretorId,
+        corretor_nome: corretorNome,
+        empreendimento: document.getElementById('manualEmpreendimento').value.trim(),
+        lote: document.getElementById('manualLote').value.trim(),
+        cliente: document.getElementById('manualCliente').value.trim(),
+        data_contrato: document.getElementById('manualDataContrato').value,
+        valor_a_vista: parseFloat(document.getElementById('manualValorAVista').value) || 0,
+        valor_comissao: parseFloat(document.getElementById('manualValorComissao').value) || 0,
+        valor_pago: parseFloat(document.getElementById('manualValorPago').value) || 0,
+        valor_gatilho: parseFloat(document.getElementById('manualValorGatilho').value) || 0,
+        observacoes: document.getElementById('manualObservacoes').value.trim()
+    };
+    
+    // Validações
+    if (!dados.corretor_id) {
+        showAlert('Selecione um corretor', 'error');
+        return;
+    }
+    
+    if (!dados.empreendimento || !dados.lote || !dados.cliente || !dados.data_contrato) {
+        showAlert('Preencha todos os campos obrigatórios', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/comissoes/manual', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dados)
+        });
+        
+        const result = await response.json();
+        
+        if (result.sucesso) {
+            showAlert('Comissão manual criada com sucesso!', 'success');
+            fecharModalComissaoManual();
+            
+            // Recarregar a tabela de comissões
+            buscarComissoes();
+        } else {
+            showAlert(result.erro || 'Erro ao criar comissão', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar comissão manual:', error);
+        showAlert('Erro ao salvar comissão manual', 'error');
+    }
+}
+
+// Fechar modal ao clicar fora
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('modalComissaoManual');
+    if (event.target === modal) {
+        fecharModalComissaoManual();
+    }
+});
+
 // Garantir que o DOM esta completamente carregado
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', inicializarSistema);
