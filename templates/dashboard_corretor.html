@@ -167,6 +167,11 @@
             color: #34d399;
         }
 
+        .gatilho-nao-info {
+            background: rgba(148, 163, 184, 0.2);
+            color: #94a3b8;
+        }
+
         .loading-corretor {
             text-align: center;
             padding: 3rem;
@@ -288,21 +293,32 @@
         function getStatusBadge(status, statusSienge) {
             const statusLower = (status || '').toLowerCase();
             const siengeLower = (statusSienge || '').toLowerCase();
-            
-            // Status de cancelamento
-            if (siengeLower.includes('cancel') || statusLower.includes('cancel')) {
+            // Parcela no Sienge primeiro (fonte do que está no ERP); evita "Cancelada" interna sobrepor Liberada sincronizada
+            if (siengeLower.includes('released') || siengeLower.includes('liberad')) {
+                return '<span class="status-badge status-liberada">Liberado</span>';
+            }
+            if (siengeLower.includes('paid') || siengeLower.includes('paidout') || siengeLower.includes('pago')) {
+                return '<span class="status-badge status-paga">Paga</span>';
+            }
+            if (siengeLower.includes('cancel')) {
                 return '<span class="status-badge status-cancelada">Cancelada</span>';
             }
-            // Status de aprovação interna
+            if (siengeLower.includes('overdue') || siengeLower.includes('vencid')) {
+                return '<span class="status-badge status-vencida">Vencida</span>';
+            }
+            if (siengeLower.includes('open') || siengeLower.includes('aberto')) {
+                return '<span class="status-badge status-aberta">Aberto</span>';
+            }
+            if (siengeLower.includes('awaiting') || siengeLower.includes('aguard')) {
+                return '<span class="status-badge status-pendente">Aguardando Autorização</span>';
+            }
             if (statusLower.includes('aprovad')) return '<span class="status-badge status-aprovada">Aprovada</span>';
             if (statusLower.includes('rejeitad')) return '<span class="status-badge status-cancelada">Rejeitada</span>';
-            if (statusLower.includes('pag') || siengeLower.includes('paid')) return '<span class="status-badge status-paga">Paga</span>';
+            if (statusLower.includes('pag')) return '<span class="status-badge status-paga">Paga</span>';
             if (statusLower.includes('pendente de aprovação')) return '<span class="status-badge status-pendente">Em análise da direção</span>';
-            // Status do Sienge
-            if (siengeLower.includes('overdue') || siengeLower.includes('vencid')) return '<span class="status-badge status-vencida">Vencida</span>';
-            if (siengeLower.includes('open') || siengeLower.includes('aberto')) return '<span class="status-badge status-aberta">Aberto</span>';
-            if (siengeLower.includes('awaiting') || siengeLower.includes('aguard')) return '<span class="status-badge status-pendente">Aguardando Autorização</span>';
-            if (siengeLower.includes('released') || siengeLower.includes('liberad')) return '<span class="status-badge status-liberada">Liberado</span>';
+            if (statusLower.includes('cancel')) {
+                return '<span class="status-badge status-cancelada">Cancelada</span>';
+            }
             return '<span class="status-badge status-pendente">Aguardando liberação</span>';
         }
 
@@ -370,7 +386,7 @@
                             </div>
                             <div class="contrato-info-item">
                                 <div class="contrato-info-label">Gatilho</div>
-                                <div class="contrato-info-value">${c.atingiu_gatilho ? '<span class="status-badge status-aprovada">Sim</span>' : '<span class="status-badge status-cancelada">Não</span>'}</div>
+                                <div class="contrato-info-value">${c.atingiu_gatilho ? '<span class="status-badge status-aprovada">Sim</span>' : '<span class="status-badge gatilho-nao-info">Não</span>'}</div>
                             </div>
                             <div class="contrato-info-item">
                                 <div class="contrato-info-label">Status</div>

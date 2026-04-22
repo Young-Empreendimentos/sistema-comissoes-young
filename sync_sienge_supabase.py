@@ -489,7 +489,7 @@ class SiengeSupabaseSync:
             return []
     
     def get_comissoes_por_corretor(self, corretor_id: int = None, corretor_nome: str = None) -> List[Dict]:
-        """Retorna comissões de um corretor"""
+        """Retorna comissões de um corretor (uma linha por contrato+empreendimento: evita parcelas duplicadas/obsoletas no Sienge)."""
         try:
             query = self.supabase.table('sienge_comissoes').select('*')
             
@@ -499,10 +499,54 @@ class SiengeSupabaseSync:
                 query = query.ilike('broker_nome', f'%{corretor_nome}%')
             
             result = query.execute()
-            return result.data if result.data else []
+            rows = result.data if result.data else []
+            return self._dedupe_comissoes_mesmo_contrato(rows)
         except Exception as e:
             print(f"Erro ao buscar comissões do corretor: {str(e)}")
             return []
+
+    @staticmethod
+    def _prioridade_installment_comissao(c: Dict) -> int:
+        """Maior = preferir para exibição quando há mais de uma parcela no mesmo contrato."""
+        inst = (c.get('installment_status') or '').upper()
+        if 'CANCEL' in inst:
+            return 0
+        if 'PAID' in inst or 'PAIDOUT' in inst or 'PAGO' in inst:
+            return 4
+        if 'RELEASE' in inst or 'LIBER' in inst:
+            return 3
+        if 'AWAIT' in inst or 'OPEN' in inst or 'OVERDUE' in inst or 'VENC' in inst:
+            return 2
+        return 1
+
+    @staticmethod
+    def _dedupe_comissoes_mesmo_contrato(rows: List[Dict]) -> List[Dict]:
+        from collections import defaultdict
+
+        buckets: Dict[tuple, List[Dict]] = defaultdict(list)
+        for c in rows:
+            nc = str(c.get('numero_contrato') or '').strip()
+            bid = str(c.get('building_id') or '').strip()
+            key = ('ct', nc, bid) if nc and bid else ('id', str(c.get('sienge_id') or ''))
+            buckets[key].append(c)
+
+        out: List[Dict] = []
+        for grupo in buckets.values():
+            if len(grupo) == 1:
+                out.append(grupo[0])
+                continue
+
+            def sort_key(c: Dict):
+                pri = SiengeSupabaseSync._prioridade_installment_comissao(c)
+                au = c.get('atualizado_em') or ''
+                try:
+                    sid = int(str(c.get('sienge_id') or '0'))
+                except ValueError:
+                    sid = 0
+                return (pri, au, sid)
+
+            out.append(max(grupo, key=sort_key))
+        return out
     
     def get_itbi_por_contrato(self, numero_contrato: str, building_id: int) -> Optional[float]:
         """Retorna valor ITBI de um contrato"""

@@ -1612,13 +1612,9 @@ def listar_todas_comissoes():
         
         print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, corretor: {corretor_param}")
         
-        # Buscar comissões (excluindo canceladas)
+        # Todas as parcelas (incl. canceladas no Sienge): excluir só pelo filtro de status da UI
         result = sync.supabase.table('sienge_comissoes').select('*').execute()
         comissoes = result.data if result.data else []
-
-        # Filtrar comissões canceladas
-        comissoes = [c for c in comissoes
-                     if 'CANCEL' not in (c.get('installment_status') or '').upper()]
 
         # Filtrar por corretor (comparação exata pelo nome)
         if corretor_param:
@@ -1633,9 +1629,11 @@ def listar_todas_comissoes():
             'aberto': ['open', 'aberto'],
             'parcial': ['partial', 'parcial'],
             'cancelado': ['cancelled', 'canceled', 'cancelado'],
+            'cancelada': ['cancelled', 'canceled', 'cancelado'],
             'aguardando autorização': ['awaiting authorization', 'awaiting_authorization', 'aguardando autorização'],
             'aguardando liberação': ['awaiting release', 'awaiting_release', 'aguardando liberação'],
-            'liberado': ['released', 'liberado']
+            'liberado': ['released', 'liberado'],
+            'liberada': ['released', 'liberado', 'liberada'],
         }
         
         if status_parcela_list:
@@ -1803,7 +1801,8 @@ def listar_todas_comissoes():
             def filtrar_por_data_comissao(comissao):
                 data_comissao = comissao.get('commission_date') or comissao.get('due_date')
                 if not data_comissao:
-                    return False
+                    # Sem data no registro: não ocultar (evita sumir da listagem por dado incompleto)
+                    return True
                 try:
                     if 'T' in str(data_comissao):
                         data_str = str(data_comissao).split('T')[0]
