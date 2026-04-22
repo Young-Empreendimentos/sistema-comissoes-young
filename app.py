@@ -1861,6 +1861,10 @@ def criar_comissao_manual():
         # Formato: MANUAL-YYYYMMDD-HHMMSS
         numero_contrato_manual = f"MANUAL-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         
+        # Gerar sienge_id negativo único para não colidir com IDs reais do Sienge
+        # Usa timestamp em milissegundos negativo (todos IDs manuais serão < 0)
+        sienge_id_manual = -int(datetime.now().timestamp() * 1000)
+        
         # Armazenar valor_gatilho e valor_pago codificados nas observações
         # Formato: [GATILHO:7027.10][VALOR_PAGO:3846.45] texto do usuário...
         obs_user = (data.get('observacoes') or '').strip()
@@ -1868,6 +1872,7 @@ def criar_comissao_manual():
         
         # Criar registro usando apenas colunas confirmadas no schema
         nova_comissao = {
+            'sienge_id': sienge_id_manual,
             'numero_contrato': numero_contrato_manual,
             'broker_id': data.get('corretor_id'),
             'broker_nome': data.get('corretor_nome'),
