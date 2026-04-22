@@ -1936,6 +1936,38 @@ def criar_comissao_manual():
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 
+@app.route('/api/comissoes/<int:comissao_id>/cancelar', methods=['POST'])
+@login_required
+def cancelar_comissao(comissao_id):
+    """Marca uma comissão como CANCELLED (oculta das listagens). Apenas admin."""
+    if not current_user.is_admin:
+        return jsonify({'sucesso': False, 'erro': 'Apenas administradores podem cancelar comissões'}), 403
+    
+    try:
+        sync = SiengeSupabaseSync()
+        
+        existe = sync.supabase.table('sienge_comissoes').select('id, installment_status, broker_nome, customer_name').eq('id', comissao_id).execute()
+        if not existe.data:
+            return jsonify({'sucesso': False, 'erro': 'Comissão não encontrada'}), 404
+        
+        comissao = existe.data[0]
+        
+        sync.supabase.table('sienge_comissoes').update({
+            'installment_status': 'CANCELLED',
+            'atualizado_em': datetime.now().isoformat()
+        }).eq('id', comissao_id).execute()
+        
+        print(f"[API] Comissão {comissao_id} cancelada por {current_user.username} | Corretor: {comissao.get('broker_nome')} | Cliente: {comissao.get('customer_name')}")
+        
+        return jsonify({
+            'sucesso': True,
+            'mensagem': 'Comissão cancelada com sucesso'
+        }), 200
+    except Exception as e:
+        print(f"[API] Erro ao cancelar comissão {comissao_id}: {str(e)}")
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
 @app.route('/api/comissoes/enviar-aprovacao', methods=['POST'])
 @login_required
 def enviar_comissoes_aprovacao():

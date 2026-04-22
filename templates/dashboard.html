@@ -1306,6 +1306,9 @@
         }
     </style>
 
-    <script src="/static/js/app.js?v=100"></script>
+    <script>
+        window.USER_IS_ADMIN = {{ 'true' if user.is_admin else 'false' }};
+    </script>
+    <script src="/static/js/app.js?v=101"></script>
 </body>
 </html>

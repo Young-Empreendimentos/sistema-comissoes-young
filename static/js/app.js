@@ -801,14 +801,26 @@ function renderizarTabelaComissoes(comissoes) {
                 <td id="atingiu-gatilho-${c.id}" class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
                 <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacaoExibicao}</span></td>
                 <td style="text-align: center;">
-                    ${isPendente ? `
-                        <button 
-                            class="btn-observacao ${observacoesComissoes[c.id] ? 'tem-observacao' : ''}" 
-                            onclick="abrirModalObservacaoComissao(${c.id}, '${corrigirEspacamentoNome(c.broker_nome)}', '${c.unit_name || '-'}')"
-                            title="Adicionar observações para a direção">
-                            💬
-                        </button>
-                    ` : '-'}
+                    <div style="display: flex; gap: 0.3rem; justify-content: center; align-items: center;">
+                        ${isPendente ? `
+                            <button 
+                                class="btn-observacao ${observacoesComissoes[c.id] ? 'tem-observacao' : ''}" 
+                                onclick="abrirModalObservacaoComissao(${c.id}, '${corrigirEspacamentoNome(c.broker_nome)}', '${c.unit_name || '-'}')"
+                                title="Adicionar observações para a direção">
+                                💬
+                            </button>
+                        ` : ''}
+                        ${window.USER_IS_ADMIN ? `
+                            <button 
+                                class="btn-cancelar-comissao"
+                                onclick="cancelarComissao(${c.id}, '${corrigirEspacamentoNome(c.broker_nome).replace(/'/g, "\\'")}', '${(c.customer_name || '').replace(/'/g, "\\'")}', '${c.unit_name || '-'}')"
+                                title="Cancelar/ocultar esta comissão"
+                                style="background: transparent; border: 1px solid #dc3545; color: #dc3545; border-radius: 4px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.9rem;">
+                                ✕
+                            </button>
+                        ` : ''}
+                        ${!isPendente && !window.USER_IS_ADMIN ? '-' : ''}
+                    </div>
                 </td>
             </tr>
         `;
@@ -2856,6 +2868,46 @@ document.addEventListener('click', function(event) {
         fecharModalComissaoManual();
     }
 });
+
+/**
+ * Cancela/oculta uma comissão (admin only).
+ * Marca installment_status como CANCELLED no banco para remover da listagem.
+ */
+async function cancelarComissao(comissaoId, brokerNome, clienteNome, unidade) {
+    const confirmacao = confirm(
+        `Tem certeza que deseja cancelar esta comissão?\n\n` +
+        `Corretor: ${brokerNome}\n` +
+        `Cliente: ${clienteNome}\n` +
+        `Lote: ${unidade}\n\n` +
+        `Ela ficará oculta de todas as listagens (será marcada como CANCELLED).`
+    );
+    
+    if (!confirmacao) return;
+    
+    try {
+        const response = await fetch(`/api/comissoes/${comissaoId}/cancelar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.sucesso) {
+            showAlert('Comissão cancelada com sucesso', 'success');
+            const linha = document.getElementById(`linha-comissao-${comissaoId}`);
+            if (linha) {
+                linha.style.transition = 'opacity 0.3s';
+                linha.style.opacity = '0';
+                setTimeout(() => linha.remove(), 300);
+            }
+        } else {
+            showAlert(data.erro || 'Erro ao cancelar comissão', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao cancelar comissão:', error);
+        showAlert('Erro ao cancelar comissão', 'error');
+    }
+}
 
 // Garantir que o DOM esta completamente carregado
 if (document.readyState === 'loading') {
