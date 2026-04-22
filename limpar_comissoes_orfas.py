@@ -39,15 +39,24 @@ print(f"      {len(ids_sienge)} ids unicos no Sienge")
 
 print("\n[2/3] Buscando comissoes no Supabase...")
 rows = sb.table('sienge_comissoes').select(
-    'id,sienge_id,numero_contrato,building_id,broker_nome,unit_name,installment_status,origem,commission_value'
+    'id,sienge_id,numero_contrato,building_id,broker_nome,unit_name,installment_status,commission_value'
 ).execute().data or []
 print(f"      {len(rows)} linhas no Supabase")
 
+def is_manual(row):
+    numero_contrato = (row.get('numero_contrato') or '')
+    if numero_contrato.startswith('MANUAL-'):
+        return True
+    try:
+        if int(str(row.get('sienge_id') or '0')) < 0:
+            return True
+    except ValueError:
+        pass
+    return False
+
 orfas = []
 for r in rows:
-    origem = (r.get('origem') or '').lower()
-    numero_contrato = (r.get('numero_contrato') or '')
-    if origem == 'manual' or numero_contrato.startswith('MANUAL-'):
+    if is_manual(r):
         continue
     sid = str(r.get('sienge_id') or '')
     if not sid:
