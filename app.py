@@ -1904,12 +1904,16 @@ def criar_comissao_manual():
             
             # Criar registro de valor pago se valor_pago > 0
             if valor_pago > 0:
-                sync.supabase.table('sienge_valor_pago').insert({
-                    'numero_contrato': numero_contrato_manual,
-                    'building_id': 'MANUAL',
-                    'valor_pago': valor_pago,
-                    'atualizado_em': datetime.now().isoformat()
-                }).execute()
+                try:
+                    sync.supabase.table('sienge_valor_pago').insert({
+                        'numero_contrato': numero_contrato_manual,
+                        'building_id': 'MANUAL',
+                        'company_id': 0,
+                        'valor_pago': valor_pago,
+                        'atualizado_em': datetime.now().isoformat()
+                    }).execute()
+                except Exception as e:
+                    print(f"[API] Erro ao inserir valor_pago (não crítico, valor está em observações): {str(e)}")
             
             print(f"[API] Comissão manual criada: {numero_contrato_manual} - Corretor: {data.get('corretor_nome')}")
             
