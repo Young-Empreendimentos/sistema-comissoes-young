@@ -74,6 +74,33 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 auth_manager = AuthManager()
 
 
+def extrair_meta_manual(comissao: dict) -> dict:
+    """Extrai valor_gatilho e valor_pago dos metadados armazenados em observacoes/regra_gatilho de comissões manuais.
+    Formato esperado: [GATILHO:XXX][VALOR_PAGO:YYY] texto livre
+    """
+    import re
+    meta = {'valor_gatilho': None, 'valor_pago': None, 'observacoes': ''}
+    texto = (comissao.get('observacoes') or '') or (comissao.get('regra_gatilho') or '')
+    if not texto:
+        return meta
+    m_gat = re.search(r'\[GATILHO:([0-9.]+)\]', texto)
+    m_pag = re.search(r'\[VALOR_PAGO:([0-9.]+)\]', texto)
+    if m_gat:
+        try:
+            meta['valor_gatilho'] = float(m_gat.group(1))
+        except ValueError:
+            pass
+    if m_pag:
+        try:
+            meta['valor_pago'] = float(m_pag.group(1))
+        except ValueError:
+            pass
+    obs_limpo = re.sub(r'\[GATILHO:[0-9.]+\]', '', texto)
+    obs_limpo = re.sub(r'\[VALOR_PAGO:[0-9.]+\]', '', obs_limpo).strip()
+    meta['observacoes'] = obs_limpo
+    return meta
+
+
 # Função para calcular o valor do gatilho a partir da string de regra
 def calcular_valor_gatilho(valor_a_vista: float, valor_itbi: float, regra: str) -> float:
     if not regra:
@@ -705,16 +732,20 @@ def contratos_por_corretor():
             if is_manual:
                 # Para comissões manuais, os valores já estão definidos no registro
                 valor_a_vista = float(c.get('valor_comissao') or 0)
+                meta = extrair_meta_manual(c)
                 valor_pago_manual = pago_map.get((numero_contrato, 'MANUAL'), 0)
-                regra_gatilho_texto = c.get('regra_gatilho') or 'Manual'
+                if valor_pago_manual == 0 and meta['valor_pago'] is not None:
+                    valor_pago_manual = meta['valor_pago']
+                regra_gatilho_texto = 'Manual'
                 
                 c['valor_pago'] = valor_pago_manual
                 c['valor_itbi'] = 0
                 c['valor_a_vista'] = valor_a_vista
                 c['regra_gatilho'] = regra_gatilho_texto
+                c['observacoes'] = meta['observacoes']
                 
-                # Para comissões manuais, calcular gatilho baseado nos valores informados
-                valor_gatilho = valor_a_vista * 0.10
+                # Usar valor_gatilho armazenado; se não existir, 10% do valor à vista
+                valor_gatilho = meta['valor_gatilho'] if meta['valor_gatilho'] is not None else valor_a_vista * 0.10
                 c['valor_gatilho'] = valor_gatilho
                 c['atingiu_gatilho'] = valor_pago_manual >= valor_gatilho if valor_gatilho > 0 else False
             else:
@@ -1668,21 +1699,21 @@ def listar_todas_comissoes():
             if is_manual:
                 # Para comissões manuais, os valores já estão definidos no registro
                 valor_a_vista = float(c.get('valor_comissao') or 0)
+                meta = extrair_meta_manual(c)
                 valor_pago_manual = pago_map.get((numero_contrato, 'MANUAL'), 0)
+                if valor_pago_manual == 0 and meta['valor_pago'] is not None:
+                    valor_pago_manual = meta['valor_pago']
+                regra_gatilho_texto = 'Manual'
                 
-                # Buscar valor_gatilho do registro (pode estar em observações ou calcular do valor)
-                regra_gatilho_texto = c.get('regra_gatilho') or 'Manual'
-                
-                # Para comissões manuais, usamos o valor_pago registrado
                 c['valor_pago'] = valor_pago_manual
                 c['valor_itbi'] = 0
                 c['valor_a_vista'] = valor_a_vista
                 c['regra_gatilho'] = regra_gatilho_texto
+                c['observacoes'] = meta['observacoes']
                 c['data_contrato'] = c.get('commission_date')
                 
-                # Para comissões manuais, calcular gatilho baseado nos valores informados
-                # O valor do gatilho é calculado como 10% do valor à vista (padrão)
-                valor_gatilho = valor_a_vista * 0.10
+                # Usar valor_gatilho armazenado; se não existir, 10% do valor à vista
+                valor_gatilho = meta['valor_gatilho'] if meta['valor_gatilho'] is not None else valor_a_vista * 0.10
                 c['valor_gatilho'] = valor_gatilho
                 c['atingiu_gatilho'] = valor_pago_manual >= valor_gatilho if valor_gatilho > 0 else False
                 
@@ -1830,28 +1861,38 @@ def criar_comissao_manual():
         # Formato: MANUAL-YYYYMMDD-HHMMSS
         numero_contrato_manual = f"MANUAL-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         
-        # Criar registro na tabela sienge_comissoes
+        # Armazenar valor_gatilho e valor_pago codificados nas observações
+        # Formato: [GATILHO:7027.10][VALOR_PAGO:3846.45] texto do usuário...
+        obs_user = (data.get('observacoes') or '').strip()
+        obs_completa = f"[GATILHO:{valor_gatilho}][VALOR_PAGO:{valor_pago}] {obs_user}".strip()
+        
+        # Criar registro usando apenas colunas confirmadas no schema
         nova_comissao = {
             'numero_contrato': numero_contrato_manual,
             'broker_id': data.get('corretor_id'),
             'broker_nome': data.get('corretor_nome'),
             'enterprise_name': data.get('empreendimento'),
-            'building_name': data.get('empreendimento'),
             'unit_name': data.get('lote'),
             'customer_name': data.get('cliente'),
             'commission_date': data.get('data_contrato'),
-            'valor_comissao': float(data.get('valor_a_vista', 0)),  # valor_comissao armazena valor à vista
+            'valor_comissao': float(data.get('valor_a_vista', 0)),
             'commission_value': float(data.get('valor_comissao', 0)),
-            'installment_status': 'Manual',  # Status especial para comissões manuais
+            'installment_status': 'Manual',
             'status_aprovacao': 'Pendente',
             'regra_gatilho': data.get('regra_gatilho', 'Manual'),
-            'observacoes': data.get('observacoes', ''),
-            'origem': 'manual',  # Indica que é uma comissão manual
-            'criado_por': current_user.id,
-            'criado_em': datetime.now().isoformat()
+            'atualizado_em': datetime.now().isoformat()
         }
         
-        result = sync.supabase.table('sienge_comissoes').insert(nova_comissao).execute()
+        # Tentar inserir com campo observacoes (se existir)
+        try:
+            nova_comissao_completa = nova_comissao.copy()
+            nova_comissao_completa['observacoes'] = obs_completa
+            result = sync.supabase.table('sienge_comissoes').insert(nova_comissao_completa).execute()
+        except Exception as e:
+            print(f"[API] Insert com 'observacoes' falhou, tentando sem: {str(e)}")
+            # Fallback: usar regra_gatilho para guardar metadados
+            nova_comissao['regra_gatilho'] = obs_completa[:200]
+            result = sync.supabase.table('sienge_comissoes').insert(nova_comissao).execute()
         
         if result.data:
             comissao_criada = result.data[0]
