@@ -25,7 +25,7 @@ os.chdir(_here)
 load_dotenv()
 
 # Configuração
-SYNC_HOUR = int(os.getenv('SYNC_HOUR', 6))  # Hora da sincronização (padrão: 6h)
+SYNC_HOUR = int(os.getenv('SYNC_HOUR', 4))  # Hora da sincronização (padrão: 4h)
 SYNC_MINUTE = int(os.getenv('SYNC_MINUTE', 0))  # Minuto (padrão: 0)
 
 # Configuração de E-mail
@@ -214,10 +214,21 @@ def main():
         replace_existing=True
     )
     
-    # Mostrar próxima execução
-    jobs = scheduler.get_jobs()
-    for job in jobs:
-        print(f"Próxima execução: {job.next_run_time}")
+    # Mostrar próxima execução (compatível com diferentes versões do APScheduler)
+    try:
+        jobs = scheduler.get_jobs()
+        for job in jobs:
+            proxima = getattr(job, 'next_run_time', None)
+            if proxima is None:
+                trigger = getattr(job, 'trigger', None)
+                if trigger is not None:
+                    try:
+                        proxima = trigger.get_next_fire_time(None, datetime.now())
+                    except Exception:
+                        proxima = None
+            print(f"Próxima execução: {proxima if proxima else 'a calcular após start()'}")
+    except Exception as e:
+        print(f"(Não foi possível exibir a próxima execução: {e})")
     
     print()
     

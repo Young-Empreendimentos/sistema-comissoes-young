@@ -192,7 +192,7 @@ Veja a seção 5 abaixo.
 | Serviço | Descrição |
 |---------|-----------|
 | `sistema-comissoes-young` | Aplicação Flask (site) |
-| `sistema-comissoes-young-scheduler` | Agendador (sincronização 6h) |
+| `sistema-comissoes-young-scheduler` | Agendador (sincronização 4h) |
 | `nginx` | Servidor web (proxy) |
 
 ### Comandos para Gerenciar Serviços
