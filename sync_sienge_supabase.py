@@ -127,7 +127,12 @@ class SiengeSupabaseSync:
             return {'sucesso': False, 'erro': str(e)}
     
     def sync_comissoes(self, building_id: int = None) -> dict:
-        """Sincroniza comissões do Sienge de todas as empresas"""
+        """Sincroniza comissões do Sienge de todas as empresas.
+        
+        IMPORTANTE: Usa sienge_id + broker_id como chave única, pois o Sienge
+        retorna múltiplas comissões com o mesmo commissionID para diferentes
+        corretores (comissão dividida).
+        """
         try:
             if building_id:
                 commissions = self.sienge.get_all_commissions_paginated(building_id=building_id)
@@ -139,6 +144,7 @@ class SiengeSupabaseSync:
                 # Campos corretos da API Sienge (conforme documentação):
                 # commissionID, salesContractNumber, enterpriseID, brokerID, etc.
                 sienge_id = commission.get('commissionID') or commission.get('id')
+                broker_id = commission.get('brokerID') or commission.get('brokerId')
                 
                 if not sienge_id:
                     print(f"[WARN] Comissão sem ID: {commission}")
@@ -149,9 +155,10 @@ class SiengeSupabaseSync:
                     'numero_contrato': commission.get('salesContractNumber') or commission.get('contractNumber'),
                     'building_id': commission.get('enterpriseID') or commission.get('buildingId'),
                     'company_id': commission.get('companyId'),
-                    'broker_id': commission.get('brokerID') or commission.get('brokerId'),
+                    'broker_id': broker_id,
                     'broker_nome': commission.get('brokerName'),
                     'customer_name': commission.get('customerName'),
+                    'customer_situation_type': commission.get('customerSituationType'),
                     'enterprise_name': commission.get('enterpriseName') or commission.get('buildingName'),
                     'unit_name': commission.get('unitName'),
                     'commission_value': commission.get('value') or commission.get('commissionValue'),
@@ -161,12 +168,19 @@ class SiengeSupabaseSync:
                     'atualizado_em': datetime.now().isoformat()
                 }
                 
-                # Verificar se a comissão já existe para não sobrescrever status_aprovacao
-                existing = self.supabase.table('comissoes_sienge_comissoes').select('id, status_aprovacao').eq('sienge_id', sienge_id).execute()
+                # Verificar se a comissão já existe usando sienge_id + broker_id como chave única
+                # (um mesmo commissionID pode ter múltiplos corretores)
+                query = self.supabase.table('comissoes_sienge_comissoes').select('id, status_aprovacao').eq('sienge_id', sienge_id)
+                if broker_id:
+                    query = query.eq('broker_id', broker_id)
+                existing = query.execute()
                 
                 if existing.data and len(existing.data) > 0:
                     # Comissão existe - atualizar sem mudar status_aprovacao
-                    self.supabase.table('comissoes_sienge_comissoes').update(data).eq('sienge_id', sienge_id).execute()
+                    update_query = self.supabase.table('comissoes_sienge_comissoes').update(data).eq('sienge_id', sienge_id)
+                    if broker_id:
+                        update_query = update_query.eq('broker_id', broker_id)
+                    update_query.execute()
                 else:
                     # Comissão nova - inserir com status_aprovacao = Pendente
                     data['status_aprovacao'] = 'Pendente'
