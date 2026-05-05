@@ -13,7 +13,7 @@ from sienge_client import sienge_client
 load_dotenv()
 
 
-VALID_BUILDING_IDS = {'2003', '2004', '2005', '2007', '2009', '2010', '2011', '2014'}
+VALID_BUILDING_IDS = {'2003', '2004', '2005', '2007', '2009', '2010', '2011', '2014', '2019'}
 
 
 class SiengeSupabaseSync:
@@ -358,6 +358,7 @@ class SiengeSupabaseSync:
             '2010': 'Erico Verissimo',
             '2011': 'Algarve',
             '2014': 'Morada da Coxilha',
+            '2019': 'Itaqui',
             2003: 'Montecarlo',
             2004: 'Ilha dos Açores',
             2005: 'Aurora',
@@ -365,11 +366,12 @@ class SiengeSupabaseSync:
             2009: 'Parque Lorena II',
             2010: 'Erico Verissimo',
             2011: 'Algarve',
-            2014: 'Morada da Coxilha'
+            2014: 'Morada da Coxilha',
+            2019: 'Itaqui'
         }
         
         # Building IDs válidos (evita mostrar IDs incorretos)
-        VALID_IDS = {2003, 2004, 2005, 2007, 2009, 2010, 2011, 2014}
+        VALID_IDS = {2003, 2004, 2005, 2007, 2009, 2010, 2011, 2014, 2019}
         
         try:
             # Buscar building_ids únicos contando contratos por empreendimento

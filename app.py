@@ -518,6 +518,7 @@ def get_contrato_info():
             '2010': 'Erico Verissimo',
             '2011': 'Algarve',
             '2014': 'Morada da Coxilha',
+            '2019': 'Itaqui',
             2003: 'Montecarlo',
             2004: 'Ilha dos Açores',
             2005: 'Aurora',
@@ -525,7 +526,8 @@ def get_contrato_info():
             2009: 'Parque Lorena II',
             2010: 'Erico Verissimo',
             2011: 'Algarve',
-            2014: 'Morada da Coxilha'
+            2014: 'Morada da Coxilha',
+            2019: 'Itaqui'
         }
         empreendimento_nome = EMPREENDIMENTOS.get(building_id, f'Empreendimento {building_id}')
         
@@ -900,6 +902,7 @@ def listar_contratos_sem_itbi():
             '2010': 'Erico Verissimo',
             '2011': 'Algarve',
             '2014': 'Morada da Coxilha',
+            '2019': 'Itaqui',
             2003: 'Montecarlo',
             2004: 'Ilha dos Açores',
             2005: 'Aurora',
@@ -907,9 +910,10 @@ def listar_contratos_sem_itbi():
             2009: 'Parque Lorena II',
             2010: 'Erico Verissimo',
             2011: 'Algarve',
-            2014: 'Morada da Coxilha'
+            2014: 'Morada da Coxilha',
+            2019: 'Itaqui'
         }
-        
+
         # Filtrar contratos sem ITBI
         contratos_sem_itbi = []
         for c in contratos:
