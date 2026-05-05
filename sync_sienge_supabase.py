@@ -368,37 +368,38 @@ class SiengeSupabaseSync:
             2014: 'Morada da Coxilha'
         }
         
+        # Building IDs válidos (evita mostrar IDs incorretos)
+        VALID_IDS = {2003, 2004, 2005, 2007, 2009, 2010, 2011, 2014}
+        
         try:
-            # Buscar building_ids unicos de sienge_contratos
-            result = self.supabase.table('comissoes_sienge_contratos')\
-                .select('building_id')\
-                .execute()
+            # Buscar building_ids únicos contando contratos por empreendimento
+            # Isso evita o limite de 1000 registros do Supabase
+            building_ids = set()
+            for bid in VALID_IDS:
+                result = self.supabase.table('comissoes_sienge_contratos')\
+                    .select('id', count='exact')\
+                    .eq('building_id', bid)\
+                    .limit(1)\
+                    .execute()
+                if result.count and result.count > 0:
+                    building_ids.add(bid)
             
-            if result.data:
-                # Extrair building_ids unicos
-                building_ids = set()
-                for c in result.data:
-                    bid = c.get('building_id')
-                    if bid:
-                        building_ids.add(bid)
-                
-                print(f"[Sync] building_ids encontrados: {sorted(building_ids, key=str)}")
-                
-                # Criar lista de empreendimentos
-                empreendimentos = []
-                for bid in building_ids:
-                    nome = EMPREENDIMENTOS.get(bid, f'Empreendimento {bid}')
-                    empreendimentos.append({
-                        'sienge_id': bid,
-                        'id': bid,
-                        'nome': nome
-                    })
-                
-                # Ordenar por nome
-                empreendimentos.sort(key=lambda x: x['nome'])
-                print(f"[Sync] get_empreendimentos: {len(empreendimentos)} registros")
-                return empreendimentos
-            return []
+            print(f"[Sync] building_ids encontrados: {sorted(building_ids)}")
+            
+            # Criar lista de empreendimentos
+            empreendimentos = []
+            for bid in building_ids:
+                nome = EMPREENDIMENTOS.get(bid, f'Empreendimento {bid}')
+                empreendimentos.append({
+                    'sienge_id': bid,
+                    'id': bid,
+                    'nome': nome
+                })
+            
+            # Ordenar por nome
+            empreendimentos.sort(key=lambda x: x['nome'])
+            print(f"[Sync] get_empreendimentos: {len(empreendimentos)} registros")
+            return empreendimentos
         except Exception as e:
             print(f"[Sync] Erro ao buscar empreendimentos: {str(e)}")
             return []
