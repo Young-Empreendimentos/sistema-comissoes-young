@@ -42,7 +42,7 @@ class SiengeSupabaseSync:
                 }
                 
                 # Upsert (insert ou update)
-                self.supabase.table('sienge_empreendimentos').upsert(
+                self.supabase.table('comissoes_sienge_empreendimentos').upsert(
                     data, 
                     on_conflict='sienge_id'
                 ).execute()
@@ -86,7 +86,7 @@ class SiengeSupabaseSync:
                     'atualizado_em': datetime.now().isoformat()
                 }
                 
-                self.supabase.table('sienge_contratos').upsert(
+                self.supabase.table('comissoes_sienge_contratos').upsert(
                     data,
                     on_conflict='sienge_id'
                 ).execute()
@@ -115,7 +115,7 @@ class SiengeSupabaseSync:
                     'atualizado_em': datetime.now().isoformat()
                 }
                 
-                self.supabase.table('sienge_corretores').upsert(
+                self.supabase.table('comissoes_sienge_corretores').upsert(
                     data,
                     on_conflict='sienge_id'
                 ).execute()
@@ -162,15 +162,15 @@ class SiengeSupabaseSync:
                 }
                 
                 # Verificar se a comissão já existe para não sobrescrever status_aprovacao
-                existing = self.supabase.table('sienge_comissoes').select('id, status_aprovacao').eq('sienge_id', sienge_id).execute()
+                existing = self.supabase.table('comissoes_sienge_comissoes').select('id, status_aprovacao').eq('sienge_id', sienge_id).execute()
                 
                 if existing.data and len(existing.data) > 0:
                     # Comissão existe - atualizar sem mudar status_aprovacao
-                    self.supabase.table('sienge_comissoes').update(data).eq('sienge_id', sienge_id).execute()
+                    self.supabase.table('comissoes_sienge_comissoes').update(data).eq('sienge_id', sienge_id).execute()
                 else:
                     # Comissão nova - inserir com status_aprovacao = Pendente
                     data['status_aprovacao'] = 'Pendente'
-                    self.supabase.table('sienge_comissoes').insert(data).execute()
+                    self.supabase.table('comissoes_sienge_comissoes').insert(data).execute()
                 
                 count += 1
             
@@ -210,20 +210,20 @@ class SiengeSupabaseSync:
                         }
                         
                         # Verificar se já existe
-                        existe = self.supabase.table('sienge_itbi')\
+                        existe = self.supabase.table('comissoes_sienge_itbi')\
                             .select('id')\
                             .eq('numero_contrato', numero_contrato)\
                             .eq('building_id', bid)\
                             .execute()
                         
                         if existe.data:
-                            self.supabase.table('sienge_itbi')\
+                            self.supabase.table('comissoes_sienge_itbi')\
                                 .update(data)\
                                 .eq('numero_contrato', numero_contrato)\
                                 .eq('building_id', bid)\
                                 .execute()
                         else:
-                            self.supabase.table('sienge_itbi').insert(data).execute()
+                            self.supabase.table('comissoes_sienge_itbi').insert(data).execute()
                         
                         count += 1
                         print(f"[ITBI] Contrato {numero_contrato}: R$ {itbi_data['valor_itbi']:.2f}")
@@ -265,20 +265,20 @@ class SiengeSupabaseSync:
                         }
                         
                         # Verificar se já existe
-                        existe = self.supabase.table('sienge_valor_pago')\
+                        existe = self.supabase.table('comissoes_sienge_valor_pago')\
                             .select('id')\
                             .eq('numero_contrato', numero_contrato)\
                             .eq('building_id', bid)\
                             .execute()
                         
                         if existe.data:
-                            self.supabase.table('sienge_valor_pago')\
+                            self.supabase.table('comissoes_sienge_valor_pago')\
                                 .update(data)\
                                 .eq('numero_contrato', numero_contrato)\
                                 .eq('building_id', bid)\
                                 .execute()
                         else:
-                            self.supabase.table('sienge_valor_pago').insert(data).execute()
+                            self.supabase.table('comissoes_sienge_valor_pago').insert(data).execute()
                         
                         count += 1
                 except Exception as e:
@@ -320,7 +320,7 @@ class SiengeSupabaseSync:
     def registrar_sincronizacao(self, resultados: dict):
         """Registra log de sincronização"""
         try:
-            self.supabase.table('log_sincronizacoes').insert({
+            self.supabase.table('comissoes_log_sincronizacoes').insert({
                 'data_sincronizacao': datetime.now().isoformat(),
                 'resultados': resultados,
                 'sucesso': all(r.get('sucesso', False) for r in resultados.values())
@@ -331,7 +331,7 @@ class SiengeSupabaseSync:
     def get_ultima_sincronizacao(self) -> Optional[dict]:
         """Retorna data da última sincronização"""
         try:
-            result = self.supabase.table('log_sincronizacoes')\
+            result = self.supabase.table('comissoes_log_sincronizacoes')\
                 .select('*')\
                 .order('data_sincronizacao', desc=True)\
                 .limit(1)\
@@ -370,7 +370,7 @@ class SiengeSupabaseSync:
         
         try:
             # Buscar building_ids unicos de sienge_contratos
-            result = self.supabase.table('sienge_contratos')\
+            result = self.supabase.table('comissoes_sienge_contratos')\
                 .select('building_id')\
                 .execute()
             
@@ -406,7 +406,7 @@ class SiengeSupabaseSync:
     def get_contratos_por_empreendimento(self, building_id: int) -> List[Dict]:
         """Retorna contratos de um empreendimento da tabela sienge_contratos"""
         try:
-            result = self.supabase.table('sienge_contratos')\
+            result = self.supabase.table('comissoes_sienge_contratos')\
                 .select('*')\
                 .eq('building_id', building_id)\
                 .order('numero_contrato')\
@@ -429,7 +429,7 @@ class SiengeSupabaseSync:
         """Retorna um contrato pelo numero da tabela sienge_contratos"""
         try:
             print(f"[Sync] get_contrato_por_numero: numero_contrato={numero_contrato}, building_id={building_id}")
-            result = self.supabase.table('sienge_contratos')\
+            result = self.supabase.table('comissoes_sienge_contratos')\
                 .select('*')\
                 .eq('numero_contrato', numero_contrato)\
                 .eq('building_id', building_id)\
@@ -449,7 +449,7 @@ class SiengeSupabaseSync:
         """Retorna todos os corretores extraidos de sienge_contratos"""
         try:
             # Tentar tabela sienge_corretores primeiro
-            result = self.supabase.table('sienge_corretores')\
+            result = self.supabase.table('comissoes_sienge_corretores')\
                 .select('*')\
                 .eq('ativo', True)\
                 .order('nome')\
@@ -463,7 +463,7 @@ class SiengeSupabaseSync:
         
         # Fallback: extrair corretores unicos de sienge_contratos
         try:
-            result = self.supabase.table('sienge_contratos')\
+            result = self.supabase.table('comissoes_sienge_contratos')\
                 .select('corretor_id, corretor')\
                 .execute()
             
@@ -491,7 +491,7 @@ class SiengeSupabaseSync:
     def get_comissoes_por_corretor(self, corretor_id: int = None, corretor_nome: str = None) -> List[Dict]:
         """Retorna comissões de um corretor (uma linha por contrato+empreendimento: evita parcelas duplicadas/obsoletas no Sienge)."""
         try:
-            query = self.supabase.table('sienge_comissoes').select('*')
+            query = self.supabase.table('comissoes_sienge_comissoes').select('*')
             
             if corretor_id:
                 query = query.eq('broker_id', corretor_id)
@@ -551,7 +551,7 @@ class SiengeSupabaseSync:
     def get_itbi_por_contrato(self, numero_contrato: str, building_id: int) -> Optional[float]:
         """Retorna valor ITBI de um contrato"""
         try:
-            result = self.supabase.table('sienge_itbi')\
+            result = self.supabase.table('comissoes_sienge_itbi')\
                 .select('valor_itbi')\
                 .eq('numero_contrato', numero_contrato)\
                 .eq('building_id', building_id)\
@@ -568,7 +568,7 @@ class SiengeSupabaseSync:
     def get_valor_pago_por_contrato(self, numero_contrato: str, building_id: int) -> Optional[float]:
         """Retorna valor pago de um contrato"""
         try:
-            result = self.supabase.table('sienge_valor_pago')\
+            result = self.supabase.table('comissoes_sienge_valor_pago')\
                 .select('valor_pago')\
                 .eq('numero_contrato', numero_contrato)\
                 .eq('building_id', building_id)\
@@ -606,7 +606,7 @@ class SiengeSupabaseSync:
         
         try:
             # Busca unificada: numero_contrato, nome_cliente e unidades (JSONB cast to text)
-            result = self.supabase.table('sienge_contratos')\
+            result = self.supabase.table('comissoes_sienge_contratos')\
                 .select('*')\
                 .or_(f'numero_contrato.ilike.%{numero_lote}%,nome_cliente.ilike.%{numero_lote}%,unidades::text.ilike.%{numero_lote}%')\
                 .limit(50)\
@@ -618,7 +618,7 @@ class SiengeSupabaseSync:
                 if 'unidades' in c and 'unidade' not in c:
                     c['unidade'] = c.get('unidades')
                 bid = c.get('building_id')
-                c['sienge_empreendimentos'] = {'nome': EMPREENDIMENTOS.get(bid, f'Empreendimento {bid}')}
+                c['comissoes_sienge_empreendimentos'] = {'nome': EMPREENDIMENTOS.get(bid, f'Empreendimento {bid}')}
             
             print(f"[Sync] buscar_contratos_por_lote('{numero_lote}'): {len(contratos)} registros")
             return contratos

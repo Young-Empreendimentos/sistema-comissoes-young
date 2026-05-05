@@ -31,7 +31,7 @@ def listar_contratos_cancelados(supabase):
     
     try:
         # Buscar todas as comissões
-        result_comissoes = supabase.table('sienge_comissoes').select('numero_contrato, building_id, installment_status').execute()
+        result_comissoes = supabase.table('comissoes_sienge_comissoes').select('numero_contrato, building_id, installment_status').execute()
         
         # Agrupar comissões por contrato
         contratos_comissoes = {}
@@ -54,7 +54,7 @@ def listar_contratos_cancelados(supabase):
         # Buscar dados completos dos contratos cancelados
         contratos_cancelados = []
         for c_id in contratos_cancelados_ids:
-            result = supabase.table('sienge_contratos')\
+            result = supabase.table('comissoes_sienge_contratos')\
                 .select('*')\
                 .eq('numero_contrato', c_id['numero_contrato'])\
                 .eq('building_id', c_id['building_id'])\
@@ -79,7 +79,7 @@ def listar_comissoes_canceladas(supabase):
     print("="*60)
     
     try:
-        result = supabase.table('sienge_comissoes').select('*').execute()
+        result = supabase.table('comissoes_sienge_comissoes').select('*').execute()
         
         comissoes_canceladas = []
         comissoes_pagas = []
@@ -101,7 +101,7 @@ def listar_comissoes_canceladas(supabase):
         # Atualizar comissões pagas para status Aprovada
         for c in comissoes_pagas:
             try:
-                supabase.table('sienge_comissoes').update({'status_aprovacao': 'Aprovada'}).eq('id', c['id']).execute()
+                supabase.table('comissoes_sienge_comissoes').update({'status_aprovacao': 'Aprovada'}).eq('id', c['id']).execute()
                 print(f"  ✓ Comissão {c.get('id')} atualizada para Aprovada")
             except Exception as e:
                 print(f"  ✗ Erro ao atualizar comissão {c.get('id')}: {str(e)}")
@@ -120,7 +120,7 @@ def buscar_duplicatas_comissoes(supabase):
     print("="*60)
     
     try:
-        result = supabase.table('sienge_comissoes').select('*').execute()
+        result = supabase.table('comissoes_sienge_comissoes').select('*').execute()
         
         # Agrupar por numero_contrato + unit_name
         grupos = {}
@@ -156,13 +156,13 @@ def deletar_contratos_cancelados(supabase, contratos):
     for c in contratos:
         try:
             # Primeiro deletar as comissões relacionadas
-            supabase.table('sienge_comissoes').delete()\
+            supabase.table('comissoes_sienge_comissoes').delete()\
                 .eq('numero_contrato', c.get('numero_contrato'))\
                 .eq('building_id', c.get('building_id')).execute()
             print(f"  Deletadas comissões do contrato {c.get('numero_contrato')}")
             
             # Depois deletar o contrato
-            supabase.table('sienge_contratos').delete().eq('id', c['id']).execute()
+            supabase.table('comissoes_sienge_contratos').delete().eq('id', c['id']).execute()
             print(f"  Deletado contrato ID {c['id']} (Contrato {c.get('numero_contrato')})")
             count += 1
         except Exception as e:
@@ -180,7 +180,7 @@ def deletar_comissoes_canceladas(supabase, comissoes):
     count = 0
     for c in comissoes:
         try:
-            supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+            supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
             print(f"  Deletada comissão ID {c['id']} (Contrato {c.get('numero_contrato')})")
             count += 1
         except Exception as e:
@@ -217,7 +217,7 @@ def limpar_duplicatas_comissoes(supabase, duplicatas):
         
         for c in deletar:
             try:
-                supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
                 print(f"    Deletada: ID {c['id']} | Corretor: {c.get('broker_nome')} | Status: {c.get('installment_status')}")
                 count += 1
             except Exception as e:

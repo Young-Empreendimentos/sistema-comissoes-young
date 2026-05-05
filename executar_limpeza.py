@@ -31,7 +31,7 @@ def executar_limpeza():
     
     # 1. DELETAR COMISSÕES CANCELADAS
     print("\n[1/3] Buscando comissões canceladas...")
-    result = supabase.table('sienge_comissoes').select('*').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('*').execute()
     
     comissoes_canceladas = []
     for c in (result.data or []):
@@ -44,7 +44,7 @@ def executar_limpeza():
     count_canceladas = 0
     for c in comissoes_canceladas:
         try:
-            supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+            supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
             count_canceladas += 1
         except Exception as e:
             print(f"    Erro ao deletar comissão {c['id']}: {str(e)}")
@@ -53,7 +53,7 @@ def executar_limpeza():
     
     # 2. BUSCAR E LIMPAR DUPLICATAS
     print("\n[2/3] Buscando comissões duplicadas...")
-    result = supabase.table('sienge_comissoes').select('*').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('*').execute()
     
     # Agrupar por numero_contrato + unit_name + building_id
     grupos = {}
@@ -82,7 +82,7 @@ def executar_limpeza():
         
         for c in deletar:
             try:
-                supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
                 count_duplicatas += 1
             except Exception as e:
                 print(f"    Erro ao deletar duplicata {c['id']}: {str(e)}")
@@ -93,10 +93,10 @@ def executar_limpeza():
     print("\n[3/3] Verificando contratos órfãos...")
     
     # Buscar todos os contratos
-    result_contratos = supabase.table('sienge_contratos').select('id, numero_contrato, building_id').execute()
+    result_contratos = supabase.table('comissoes_sienge_contratos').select('id, numero_contrato, building_id').execute()
     
     # Buscar todas as comissões restantes
-    result_comissoes = supabase.table('sienge_comissoes').select('numero_contrato, building_id').execute()
+    result_comissoes = supabase.table('comissoes_sienge_comissoes').select('numero_contrato, building_id').execute()
     
     # Criar set de contratos com comissões
     contratos_com_comissoes = set()

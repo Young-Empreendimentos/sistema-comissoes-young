@@ -119,7 +119,7 @@ try:
     if url and key:
         supabase = create_client(url, key)
         # Testar query simples
-        result = supabase.table('usuarios').select('id').limit(1).execute()
+        result = supabase.table('comissoes_usuarios').select('id').limit(1).execute()
         print("  ✅ Conexão Supabase OK")
     else:
         print("  ⏭️  Supabase não testado (credenciais faltando)")

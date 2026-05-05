@@ -16,7 +16,7 @@ from supabase import create_client
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 
 def main():
-    result = supabase.table('sienge_comissoes').select('*').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('*').execute()
     comissoes = result.data or []
     
     print(f"Total de comissões no banco: {len(comissoes)}")

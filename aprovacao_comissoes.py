@@ -35,7 +35,7 @@ class AprovacaoComissoes:
     def obter_emails_por_tipo(self, tipo: str) -> List[str]:
         """Obtém lista de e-mails configurados por tipo"""
         try:
-            result = self.supabase.table('configuracoes_emails')\
+            result = self.supabase.table('comissoes_configuracoes_emails')\
                 .select('emails')\
                 .eq('tipo', tipo)\
                 .eq('ativo', True)\
@@ -73,7 +73,7 @@ class AprovacaoComissoes:
             valor_total = 0
             
             for comissao_id in comissoes_ids:
-                response = self.supabase.table('sienge_comissoes')\
+                response = self.supabase.table('comissoes_sienge_comissoes')\
                     .select('*')\
                     .eq('id', comissao_id)\
                     .execute()
@@ -102,7 +102,7 @@ class AprovacaoComissoes:
                     'status': 'Enviado'
                 }
                 
-                lote_response = self.supabase.table('lotes_aprovacao').insert(lote_data).execute()
+                lote_response = self.supabase.table('comissoes_lotes_aprovacao').insert(lote_data).execute()
                 
                 if lote_response.data:
                     lote_id = lote_response.data[0]['id']
@@ -129,11 +129,11 @@ class AprovacaoComissoes:
                     if observacao_comissao:
                         update_data['observacoes_corretor'] = observacao_comissao
                     
-                    self.supabase.table('sienge_comissoes').update(update_data).eq('id', comissao['id']).execute()
+                    self.supabase.table('comissoes_sienge_comissoes').update(update_data).eq('id', comissao['id']).execute()
                 except Exception as e:
                     print(f"Erro com campos extras, tentando apenas status: {str(e)}")
                     try:
-                        self.supabase.table('sienge_comissoes').update({
+                        self.supabase.table('comissoes_sienge_comissoes').update({
                             'status_aprovacao': self.STATUS_PENDENTE_APROVACAO
                         }).eq('id', comissao['id']).execute()
                     except Exception as e2:
@@ -141,7 +141,7 @@ class AprovacaoComissoes:
                 
                 # Tentar registrar no histórico (opcional)
                 try:
-                    self.supabase.table('historico_aprovacoes').insert({
+                    self.supabase.table('comissoes_historico_aprovacoes').insert({
                         'comissao_id': comissao['id'],
                         'status_anterior': comissao.get('status_aprovacao', self.STATUS_PENDENTE),
                         'status_novo': self.STATUS_PENDENTE_APROVACAO,
@@ -154,7 +154,7 @@ class AprovacaoComissoes:
                 # Tentar vincular ao lote (opcional)
                 if lote_id:
                     try:
-                        self.supabase.table('comissoes_lotes').insert({
+                        self.supabase.table('comissoes_comissoes_lotes').insert({
                             'comissao_id': comissao['id'],
                             'lote_id': lote_id
                         }).execute()
@@ -167,7 +167,7 @@ class AprovacaoComissoes:
             # 5. Tentar atualizar flag de e-mail enviado no lote (opcional)
             if lote_id:
                 try:
-                    self.supabase.table('lotes_aprovacao').update({
+                    self.supabase.table('comissoes_lotes_aprovacao').update({
                         'email_enviado': email_enviado
                     }).eq('id', lote_id).execute()
                 except Exception as e:
@@ -201,7 +201,7 @@ class AprovacaoComissoes:
             
             for comissao_id in comissoes_ids:
                 # Validar que está pendente de aprovação
-                response = self.supabase.table('sienge_comissoes')\
+                response = self.supabase.table('comissoes_sienge_comissoes')\
                     .select('*')\
                     .eq('id', comissao_id)\
                     .execute()
@@ -213,7 +213,7 @@ class AprovacaoComissoes:
                     observacao_comissao = observacoes.get(str(comissao_id), observacoes.get(comissao_id))
                     
                     # Atualizar status (sem observacoes_direcao pois coluna não existe)
-                    self.supabase.table('sienge_comissoes').update({
+                    self.supabase.table('comissoes_sienge_comissoes').update({
                         'status_aprovacao': self.STATUS_APROVADA,
                         'data_aprovacao': datetime.now().isoformat(),
                         'aprovado_por': usuario_id
@@ -225,7 +225,7 @@ class AprovacaoComissoes:
                     
                     # Registrar no histórico (opcional)
                     try:
-                        self.supabase.table('historico_aprovacoes').insert({
+                        self.supabase.table('comissoes_historico_aprovacoes').insert({
                             'comissao_id': comissao_id,
                             'status_anterior': comissao.get('status_aprovacao', self.STATUS_PENDENTE_APROVACAO),
                             'status_novo': self.STATUS_APROVADA,
@@ -272,7 +272,7 @@ class AprovacaoComissoes:
             
             for comissao_id in comissoes_ids:
                 # Buscar status atual
-                response = self.supabase.table('sienge_comissoes')\
+                response = self.supabase.table('comissoes_sienge_comissoes')\
                     .select('status_aprovacao')\
                     .eq('id', comissao_id)\
                     .limit(1)\
@@ -291,7 +291,7 @@ class AprovacaoComissoes:
                     texto_completo = f"{motivo}\n\nObservações da Direção: {observacao_comissao}"
                 
                 # Atualizar status (sem observacoes_direcao pois coluna não existe)
-                self.supabase.table('sienge_comissoes').update({
+                self.supabase.table('comissoes_sienge_comissoes').update({
                     'status_aprovacao': self.STATUS_REJEITADA,
                     'data_aprovacao': datetime.now().isoformat(),
                     'aprovado_por': usuario_id,
@@ -300,7 +300,7 @@ class AprovacaoComissoes:
                 
                 # Registrar no histórico (opcional)
                 try:
-                    self.supabase.table('historico_aprovacoes').insert({
+                    self.supabase.table('comissoes_historico_aprovacoes').insert({
                         'comissao_id': comissao_id,
                         'status_anterior': status_anterior,
                         'status_novo': self.STATUS_REJEITADA,
@@ -539,7 +539,7 @@ class AprovacaoComissoes:
     def listar_comissoes_por_status(self, status: Optional[str] = None, gatilho_atingido: Optional[bool] = None) -> List[Dict]:
         """Lista comissões com filtros opcionais (excluindo canceladas)"""
         try:
-            query = self.supabase.table('sienge_comissoes').select('*')
+            query = self.supabase.table('comissoes_sienge_comissoes').select('*')
             
             if status:
                 query = query.eq('status_aprovacao', status)

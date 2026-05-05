@@ -40,7 +40,7 @@ def sincronizar_itbis_faltantes():
     try:
         # Buscar ITBIs existentes no Supabase
         print("\n[1/3] Verificando ITBIs existentes no Supabase...")
-        result_itbi = supabase.table('sienge_itbi')\
+        result_itbi = supabase.table('comissoes_sienge_itbi')\
             .select('numero_contrato, building_id')\
             .execute()
         
@@ -104,7 +104,7 @@ def sincronizar_itbis_faltantes():
                     
                     if ja_existe:
                         # Atualizar existente
-                        supabase.table('sienge_itbi')\
+                        supabase.table('comissoes_sienge_itbi')\
                             .update(data)\
                             .eq('numero_contrato', numero)\
                             .eq('building_id', bid)\
@@ -112,7 +112,7 @@ def sincronizar_itbis_faltantes():
                         itbis_atualizados += 1
                     else:
                         # Inserir novo
-                        supabase.table('sienge_itbi').insert(data).execute()
+                        supabase.table('comissoes_sienge_itbi').insert(data).execute()
                         itbis_novos += 1
                         print(f"[{idx}/{total_contratos}] [NOVO] Contrato {numero} (Emp {bid}): R$ {valor_itbi:,.2f}")
                 else:

@@ -15,7 +15,7 @@ from supabase import create_client
 
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 
-result = supabase.table('sienge_comissoes').select('status_aprovacao, installment_status').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('status_aprovacao, installment_status').execute()
 
 # Contar status de aprovação
 status_aprovacao_count = {}
@@ -43,7 +43,7 @@ print("\n" + "=" * 60)
 print("COMISSÕES APROVADAS E NÃO PAGAS:")
 print("=" * 60)
 
-result2 = supabase.table('sienge_comissoes').select('*').eq('status_aprovacao', 'Aprovada').execute()
+result2 = supabase.table('comissoes_sienge_comissoes').select('*').eq('status_aprovacao', 'Aprovada').execute()
 aprovadas = result2.data or []
 
 nao_pagas = [c for c in aprovadas if 'PAID' not in (c.get('installment_status') or '').upper()]

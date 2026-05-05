@@ -33,7 +33,7 @@ def main():
     print("LIMPANDO DUPLICADOS V2 - COM REMOÇÃO DE HISTÓRICO")
     print("=" * 80)
 
-    result = supabase.table('sienge_comissoes').select('*').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('*').execute()
     comissoes = result.data or []
     print(f"\nTotal de comissões no banco: {len(comissoes)}")
 
@@ -66,9 +66,9 @@ def main():
             for c in remover:
                 try:
                     # Primeiro remover do histórico
-                    supabase.table('historico_aprovacoes').delete().eq('comissao_id', c['id']).execute()
+                    supabase.table('comissoes_historico_aprovacoes').delete().eq('comissao_id', c['id']).execute()
                     # Depois deletar a comissão
-                    supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                    supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
                     print(f"  REMOVER: ID {c.get('id')} | Sienge {c.get('sienge_id')} | {c.get('installment_status')} | R$ {c.get('commission_value')}")
                     removidos += 1
                 except Exception as e:

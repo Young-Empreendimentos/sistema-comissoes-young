@@ -23,7 +23,7 @@ def main():
     
     # 1. Buscar registros com unit_name errado (> 1000)
     print("\n[1/2] Buscando registros com unit_name > 1000...")
-    result = supabase.table('sienge_comissoes').select('id, sienge_id, unit_name, broker_nome, numero_contrato').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('id, sienge_id, unit_name, broker_nome, numero_contrato').execute()
     
     registros = result.data or []
     print(f"      {len(registros)} registros no banco")
@@ -52,7 +52,7 @@ def main():
     
     for reg in registros_errados:
         try:
-            supabase.table('sienge_comissoes').delete().eq('id', reg['id']).execute()
+            supabase.table('comissoes_sienge_comissoes').delete().eq('id', reg['id']).execute()
             print(f"  [REMOVIDO] ID {reg['id']}: unit_name={reg.get('unit_name')}, corretor={reg.get('broker_nome')}, contrato={reg.get('numero_contrato')}")
             removidos += 1
         except Exception as e:

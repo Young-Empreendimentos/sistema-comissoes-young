@@ -20,7 +20,7 @@ print("VERIFICANDO CONTRATOS COM MÚLTIPLAS COMISSÕES")
 print("=" * 80)
 
 # Buscar todas as comissões
-result = supabase.table('sienge_comissoes').select('id, sienge_id, numero_contrato, unit_name, enterprise_name, broker_nome, customer_name, installment_status, commission_value').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('id, sienge_id, numero_contrato, unit_name, enterprise_name, broker_nome, customer_name, installment_status, commission_value').execute()
 
 comissoes = result.data or []
 print(f"\nTotal de comissões no banco: {len(comissoes)}")

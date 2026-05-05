@@ -38,7 +38,7 @@ for c in commissions:
 print(f"      {len(ids_sienge)} ids unicos no Sienge")
 
 print("\n[2/3] Buscando comissoes no Supabase...")
-rows = sb.table('sienge_comissoes').select(
+rows = sb.table('comissoes_sienge_comissoes').select(
     'id,sienge_id,numero_contrato,building_id,broker_nome,unit_name,installment_status,commission_value'
 ).execute().data or []
 print(f"      {len(rows)} linhas no Supabase")
@@ -86,7 +86,7 @@ ok = 0
 err = 0
 for r in orfas:
     try:
-        sb.table('sienge_comissoes').delete().eq('id', r['id']).execute()
+        sb.table('comissoes_sienge_comissoes').delete().eq('id', r['id']).execute()
         ok += 1
     except Exception as e:
         err += 1

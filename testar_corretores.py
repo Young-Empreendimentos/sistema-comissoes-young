@@ -11,7 +11,7 @@ supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 cpf_teste = "99416549053"  # CPF do Pablo sem formatação
 print(f'=== TESTANDO BUSCA POR CPF: {cpf_teste} ===')
 
-result = supabase.table('sienge_corretores').select('sienge_id, cpf, cnpj, nome').execute()
+result = supabase.table('comissoes_sienge_corretores').select('sienge_id, cpf, cnpj, nome').execute()
 
 encontrado = None
 for c in (result.data or []):

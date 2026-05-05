@@ -41,8 +41,8 @@ try:
     print("✓ Cliente Supabase criado com sucesso")
     
     # Testar consulta simples
-    print("\nTestando consulta na tabela 'usuarios'...")
-    result = supabase.table('usuarios').select('id, username, nome_completo').limit(5).execute()
+    print("\nTestando consulta na tabela 'comissoes_usuarios'...")
+    result = supabase.table('comissoes_usuarios').select('id, username, nome_completo').limit(5).execute()
     
     if result.data:
         print(f"✓ Conexão bem-sucedida! {len(result.data)} usuário(s) encontrado(s):")

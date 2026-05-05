@@ -86,7 +86,7 @@ class AuthManager:
             username_normalizado = username.strip().lower()
             
             # Buscar todos os usuários e filtrar case-insensitive
-            resultado = self.supabase.table('usuarios')\
+            resultado = self.supabase.table('comissoes_usuarios')\
                 .select('*')\
                 .execute()
             
@@ -137,7 +137,7 @@ class AuthManager:
             
             # Atualizar último login (opcional)
             try:
-                self.supabase.table('usuarios')\
+                self.supabase.table('comissoes_usuarios')\
                     .update({'ultimo_login': datetime.now().isoformat()})\
                     .eq('id', usuario_data['id'])\
                     .execute()
@@ -167,7 +167,7 @@ class AuthManager:
             print(f"[AUTH] Tentando autenticar corretor com documento: {doc_limpo}")
             
             # Buscar todos os corretores e filtrar em Python (mais confiável)
-            resultado = self.supabase.table('sienge_corretores')\
+            resultado = self.supabase.table('comissoes_sienge_corretores')\
                 .select('*')\
                 .execute()
             
@@ -205,7 +205,7 @@ class AuthManager:
             
             # Atualizar último login
             try:
-                self.supabase.table('sienge_corretores')\
+                self.supabase.table('comissoes_sienge_corretores')\
                     .update({'ultimo_login': datetime.now().isoformat()})\
                     .eq('sienge_id', corretor_data['sienge_id'])\
                     .execute()
@@ -231,7 +231,7 @@ class AuthManager:
             # Verificar se é corretor
             if str(user_id).startswith('corretor_'):
                 corretor_id = int(user_id.replace('corretor_', ''))
-                resultado = self.supabase.table('sienge_corretores')\
+                resultado = self.supabase.table('comissoes_sienge_corretores')\
                     .select('*')\
                     .eq('sienge_id', corretor_id)\
                     .execute()
@@ -251,7 +251,7 @@ class AuthManager:
                 return None
             
             # Buscar usuário gestor
-            resultado = self.supabase.table('usuarios')\
+            resultado = self.supabase.table('comissoes_usuarios')\
                 .select('*')\
                 .eq('id', int(user_id))\
                 .eq('ativo', True)\
@@ -275,7 +275,7 @@ class AuthManager:
         """Cria um novo usuário gestor"""
         try:
             # Verificar se username já existe
-            existente = self.supabase.table('usuarios')\
+            existente = self.supabase.table('comissoes_usuarios')\
                 .select('id')\
                 .eq('username', username)\
                 .execute()
@@ -284,7 +284,7 @@ class AuthManager:
                 return {'sucesso': False, 'erro': 'Username já existe'}
             
             # Criar usuário
-            resultado = self.supabase.table('usuarios').insert({
+            resultado = self.supabase.table('comissoes_usuarios').insert({
                 'username': username.lower(),
                 'password_hash': self._hash_senha(senha),
                 'nome_completo': nome_completo,
@@ -311,7 +311,7 @@ class AuthManager:
             corretor = None
             
             if sienge_id:
-                existente = self.supabase.table('sienge_corretores')\
+                existente = self.supabase.table('comissoes_sienge_corretores')\
                     .select('*')\
                     .eq('sienge_id', sienge_id)\
                     .execute()
@@ -320,7 +320,7 @@ class AuthManager:
             
             # Se não encontrou por sienge_id, buscar por CPF/CNPJ
             if not corretor:
-                existente = self.supabase.table('sienge_corretores')\
+                existente = self.supabase.table('comissoes_sienge_corretores')\
                     .select('*')\
                     .execute()
                 
@@ -350,7 +350,7 @@ class AuthManager:
             if email:
                 atualizacao['email'] = email
             
-            resultado = self.supabase.table('sienge_corretores')\
+            resultado = self.supabase.table('comissoes_sienge_corretores')\
                 .update(atualizacao)\
                 .eq('sienge_id', corretor['sienge_id'])\
                 .execute()
@@ -368,7 +368,7 @@ class AuthManager:
     def listar_usuarios(self) -> list:
         """Lista todos os usuários ativos"""
         try:
-            resultado = self.supabase.table('usuarios')\
+            resultado = self.supabase.table('comissoes_usuarios')\
                 .select('id, username, nome_completo, is_admin, perfil, criado_em, ultimo_login')\
                 .eq('ativo', True)\
                 .order('nome_completo')\
@@ -382,7 +382,7 @@ class AuthManager:
         """Lista todos os corretores que têm acesso ao sistema (com senha cadastrada)"""
         try:
             # Buscar corretores que têm senha_hash (ou seja, cadastraram acesso)
-            resultado = self.supabase.table('sienge_corretores')\
+            resultado = self.supabase.table('comissoes_sienge_corretores')\
                 .select('sienge_id, cpf, cnpj, nome, email, telefone, ativo, ultimo_login, cadastro_login_em')\
                 .not_.is_('senha_hash', 'null')\
                 .order('nome')\
@@ -408,13 +408,13 @@ class AuthManager:
         try:
             if is_corretor:
                 # Para corretor, usar sienge_corretores com sienge_id
-                self.supabase.table('sienge_corretores')\
+                self.supabase.table('comissoes_sienge_corretores')\
                     .update({'senha_hash': self._hash_senha(nova_senha)})\
                     .eq('sienge_id', user_id)\
                     .execute()
             else:
                 # Para gestor, usar usuarios com id
-                self.supabase.table('usuarios')\
+                self.supabase.table('comissoes_usuarios')\
                     .update({'password_hash': self._hash_senha(nova_senha)})\
                     .eq('id', user_id)\
                     .execute()
@@ -428,12 +428,12 @@ class AuthManager:
         try:
             if is_corretor:
                 # Para corretor, remover a senha (não desativa o corretor no SIENGE)
-                self.supabase.table('sienge_corretores')\
+                self.supabase.table('comissoes_sienge_corretores')\
                     .update({'senha_hash': None})\
                     .eq('sienge_id', user_id)\
                     .execute()
             else:
-                self.supabase.table('usuarios')\
+                self.supabase.table('comissoes_usuarios')\
                     .update({'ativo': False})\
                     .eq('id', user_id)\
                     .execute()

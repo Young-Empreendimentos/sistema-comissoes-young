@@ -35,7 +35,7 @@ else:
 # 2. Buscar comissões do Supabase
 print("\n\n2. DADOS DO SUPABASE:")
 print("-" * 40)
-result = supabase.table('sienge_comissoes').select('*').limit(3).execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').limit(3).execute()
 if result.data:
     print(f"Total de comissões no banco: {len(result.data)}")
     print("\nExemplo de comissão (primeira):")
@@ -51,7 +51,7 @@ else:
 # 3. Verificar se commission_value está preenchido
 print("\n\n3. VERIFICAÇÃO DO CAMPO commission_value:")
 print("-" * 40)
-result_values = supabase.table('sienge_comissoes').select('id, commission_value, broker_nome, enterprise_name').limit(10).execute()
+result_values = supabase.table('comissoes_sienge_comissoes').select('id, commission_value, broker_nome, enterprise_name').limit(10).execute()
 if result_values.data:
     for c in result_values.data:
         valor = c.get('commission_value')

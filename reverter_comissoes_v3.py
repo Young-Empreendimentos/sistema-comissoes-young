@@ -12,7 +12,7 @@ supabase = create_client(
 )
 
 # Buscar TODAS as comissões
-result = supabase.table('sienge_comissoes')\
+result = supabase.table('comissoes_sienge_comissoes')\
     .select('id, status_aprovacao, broker_nome')\
     .execute()
 
@@ -34,7 +34,7 @@ with open('resultado_reversao.txt', 'w', encoding='utf-8') as f:
         revertidas = 0
         for c in comissoes_para_reverter:
             try:
-                supabase.table('sienge_comissoes')\
+                supabase.table('comissoes_sienge_comissoes')\
                     .update({
                         'status_aprovacao': 'Pendente',
                         'data_envio_aprovacao': None,

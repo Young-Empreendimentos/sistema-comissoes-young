@@ -22,7 +22,7 @@ print("=" * 70)
 
 # 1. Comissões no Supabase
 print("\n[SUPABASE] Comissões da Andreice:")
-result = supabase.table('sienge_comissoes').select('*').ilike('broker_nome', '%andreice%').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').ilike('broker_nome', '%andreice%').execute()
 
 banco_comissoes = {}
 for c in (result.data or []):

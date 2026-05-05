@@ -30,7 +30,7 @@ def investigar_contratos_supabase():
     supabase = conectar_supabase()
     
     # Buscar alguns contratos
-    result = supabase.table('sienge_contratos').select('*').limit(5).execute()
+    result = supabase.table('comissoes_sienge_contratos').select('*').limit(5).execute()
     
     if result.data:
         print(f"\nTotal de contratos encontrados (amostra): {len(result.data)}")
@@ -46,7 +46,7 @@ def investigar_contratos_supabase():
         print("VALORES ÚNICOS DO CAMPO 'status':")
         
         # Buscar todos para ver valores únicos de status
-        result_all = supabase.table('sienge_contratos').select('status, numero_contrato, nome_cliente').execute()
+        result_all = supabase.table('comissoes_sienge_contratos').select('status, numero_contrato, nome_cliente').execute()
         
         status_unicos = {}
         for c in (result_all.data or []):
@@ -98,7 +98,7 @@ def investigar_comissoes_supabase():
     supabase = conectar_supabase()
     
     # Buscar algumas comissões
-    result = supabase.table('sienge_comissoes').select('*').limit(5).execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('*').limit(5).execute()
     
     if result.data:
         print(f"\nTotal de comissões encontradas (amostra): {len(result.data)}")
@@ -122,7 +122,7 @@ def buscar_contrato_especifico(numero_contrato):
     supabase = conectar_supabase()
     
     # Buscar no Supabase
-    result = supabase.table('sienge_contratos')\
+    result = supabase.table('comissoes_sienge_contratos')\
         .select('*')\
         .eq('numero_contrato', numero_contrato)\
         .execute()
@@ -135,7 +135,7 @@ def buscar_contrato_especifico(numero_contrato):
         print(f"Contrato {numero_contrato} não encontrado no Supabase")
     
     # Buscar comissões relacionadas
-    result_comissoes = supabase.table('sienge_comissoes')\
+    result_comissoes = supabase.table('comissoes_sienge_comissoes')\
         .select('*')\
         .eq('numero_contrato', numero_contrato)\
         .execute()

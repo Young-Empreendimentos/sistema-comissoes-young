@@ -40,7 +40,7 @@ def main():
     
     # 2. Buscar registros no Supabase que precisam correção
     print("\n[2/3] Buscando registros no Supabase...")
-    result = supabase.table('sienge_comissoes').select('id, sienge_id, unit_name').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('id, sienge_id, unit_name').execute()
     
     registros = result.data or []
     print(f"      {len(registros)} registros no banco")
@@ -74,7 +74,7 @@ def main():
         
         if precisa_corrigir:
             try:
-                supabase.table('sienge_comissoes').update({
+                supabase.table('comissoes_sienge_comissoes').update({
                     'unit_name': unit_name_correto,
                     'atualizado_em': datetime.now().isoformat()
                 }).eq('id', reg['id']).execute()

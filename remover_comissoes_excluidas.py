@@ -41,7 +41,7 @@ def main():
     
     # 2. Buscar todas comissões do banco
     print("\n[2/3] Buscando comissões do banco...")
-    result = supabase.table('sienge_comissoes').select('id, sienge_id, numero_contrato, broker_nome, installment_status, commission_value').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('id, sienge_id, numero_contrato, broker_nome, installment_status, commission_value').execute()
     comissoes_banco = result.data or []
     print(f"      {len(comissoes_banco)} comissões no banco")
     
@@ -80,9 +80,9 @@ def main():
     for c in excluidas:
         try:
             # Primeiro remover do histórico de aprovações
-            supabase.table('historico_aprovacoes').delete().eq('comissao_id', c['id']).execute()
+            supabase.table('comissoes_historico_aprovacoes').delete().eq('comissao_id', c['id']).execute()
             # Depois remover a comissão
-            supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+            supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
             removidas += 1
             print(f"  [OK] Removida: Contrato {c.get('numero_contrato')} | {c.get('broker_nome')}")
         except Exception as e:

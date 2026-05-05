@@ -16,7 +16,7 @@ numero_contrato = '198'
 building_id = '2010'
 
 # Buscar a comissão do banco
-comissao_result = supabase.table('sienge_comissoes').select('*').eq('numero_contrato', '198').eq('building_id', 2010).execute()
+comissao_result = supabase.table('comissoes_sienge_comissoes').select('*').eq('numero_contrato', '198').eq('building_id', 2010).execute()
 
 if comissao_result.data:
     c = comissao_result.data[0]

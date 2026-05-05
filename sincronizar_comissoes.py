@@ -30,7 +30,7 @@ def sincronizar_comissoes():
     
     # 2. Buscar comissoes existentes no Supabase
     print("\n[2/3] Verificando comissoes existentes no Supabase...")
-    result = supabase.table('sienge_comissoes').select('sienge_id').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('sienge_id').execute()
     # sienge_id no Supabase e string, entao convertemos para int para comparacao
     existentes = set(int(item['sienge_id']) for item in (result.data or []) if item['sienge_id'])
     print(f"      {len(existentes)} comissoes ja cadastradas")
@@ -80,26 +80,26 @@ def sincronizar_comissoes():
             building_id = data['building_id']
             
             # Verificar se ja existe no banco por sienge_id E broker_id
-            existe = supabase.table('sienge_comissoes').select('id,sienge_id').eq('sienge_id', str(sienge_id)).eq('broker_id', broker_id).execute()
+            existe = supabase.table('comissoes_sienge_comissoes').select('id,sienge_id').eq('sienge_id', str(sienge_id)).eq('broker_id', broker_id).execute()
             
             if existe.data:
                 # Atualizar pelo sienge_id + broker_id
-                supabase.table('sienge_comissoes').update(data).eq('sienge_id', str(sienge_id)).eq('broker_id', broker_id).execute()
+                supabase.table('comissoes_sienge_comissoes').update(data).eq('sienge_id', str(sienge_id)).eq('broker_id', broker_id).execute()
                 atualizados += 1
             else:
                 # Verificar se existe pelo numero_contrato + broker_id + building_id (caso o sienge_id tenha mudado)
-                existe_por_contrato = supabase.table('sienge_comissoes').select('id,sienge_id').eq('numero_contrato', numero_contrato).eq('broker_id', broker_id).eq('building_id', building_id).execute()
+                existe_por_contrato = supabase.table('comissoes_sienge_comissoes').select('id,sienge_id').eq('numero_contrato', numero_contrato).eq('broker_id', broker_id).eq('building_id', building_id).execute()
                 
                 if existe_por_contrato.data:
                     # Atualizar registro existente (sienge_id mudou no Sienge)
                     old_sienge_id = existe_por_contrato.data[0].get('sienge_id')
                     print(f"      [UPDATE] Contrato {numero_contrato} - sienge_id mudou de {old_sienge_id} para {sienge_id}")
-                    supabase.table('sienge_comissoes').update(data).eq('numero_contrato', numero_contrato).eq('broker_id', broker_id).eq('building_id', building_id).execute()
+                    supabase.table('comissoes_sienge_comissoes').update(data).eq('numero_contrato', numero_contrato).eq('broker_id', broker_id).eq('building_id', building_id).execute()
                     atualizados += 1
                 else:
                     # Inserir novo registro
                     data['status_aprovacao'] = 'Pendente'
-                    supabase.table('sienge_comissoes').insert(data).execute()
+                    supabase.table('comissoes_sienge_comissoes').insert(data).execute()
                     novos += 1
                     print(f"      [NOVO] ID {sienge_id} - {commission.get('brokerName')} - Contrato {commission.get('salesContractNumber')} - R$ {commission.get('value')}")
                 

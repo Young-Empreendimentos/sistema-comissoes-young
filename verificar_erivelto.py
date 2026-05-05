@@ -10,7 +10,7 @@ load_dotenv()
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 
 # Buscar por nome do cliente
-result = supabase.table('sienge_comissoes').select('*').ilike('customer_name', '%ERIVELTO%').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').ilike('customer_name', '%ERIVELTO%').execute()
 
 print("=== COMISSÕES DO ERIVELTO ===")
 if result.data:
@@ -27,7 +27,7 @@ else:
 
 # Verificar também por lote 323
 print("\n\n=== COMISSÕES DO LOTE 323 ===")
-result2 = supabase.table('sienge_comissoes').select('*').eq('unit_name', '323').execute()
+result2 = supabase.table('comissoes_sienge_comissoes').select('*').eq('unit_name', '323').execute()
 
 if result2.data:
     for c in result2.data:

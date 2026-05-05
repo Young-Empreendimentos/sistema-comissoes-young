@@ -22,7 +22,7 @@ print("=" * 70)
 
 # 1. Verificar no Supabase
 print("\n[SUPABASE] Buscando comissão...")
-result = supabase.table('sienge_comissoes').select('*').eq('numero_contrato', '161').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').eq('numero_contrato', '161').execute()
 
 if result.data:
     for c in result.data:

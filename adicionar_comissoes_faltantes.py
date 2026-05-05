@@ -29,7 +29,7 @@ def main():
     
     # 2. Buscar comissões existentes no Supabase
     print("\n[2/3] Verificando comissões existentes no Supabase...")
-    result = supabase.table('sienge_comissoes').select('sienge_id, broker_id').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('sienge_id, broker_id').execute()
     
     # Criar set de chaves existentes (sienge_id + broker_id)
     existentes = set()
@@ -98,7 +98,7 @@ def main():
                 'atualizado_em': datetime.now().isoformat()
             }
             
-            supabase.table('sienge_comissoes').insert(data).execute()
+            supabase.table('comissoes_sienge_comissoes').insert(data).execute()
             inseridos += 1
             print(f"  [INSERIDO] {commission.get('brokerName')} - Contrato {commission.get('salesContractNumber')} - R$ {commission.get('value')}")
             

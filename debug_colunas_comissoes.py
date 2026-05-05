@@ -20,7 +20,7 @@ print("COLUNAS DA TABELA sienge_comissoes")
 print("=" * 60)
 
 # Buscar 1 registro para ver os campos
-result = supabase.table('sienge_comissoes').select('*').limit(1).execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').limit(1).execute()
 
 if result.data:
     print("\nCampos disponíveis:")

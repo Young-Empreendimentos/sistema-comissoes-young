@@ -12,7 +12,7 @@ supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 
 def main():
     # Buscar um registro errado do Supabase
-    result = supabase.table('sienge_comissoes').select('*').eq('id', 878).execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('*').eq('id', 878).execute()
     
     if result.data:
         reg = result.data[0]

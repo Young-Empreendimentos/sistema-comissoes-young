@@ -15,7 +15,7 @@ def main():
     print("=" * 80)
     
     # Buscar comissões que têm unit_name com valores altos (parecem ser billNumber)
-    result = supabase.table('sienge_comissoes').select('*').limit(20).execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('*').limit(20).execute()
     
     print(f"\nTotal de registros retornados: {len(result.data)}")
     
@@ -32,7 +32,7 @@ def main():
     print("COMISSÕES COM unit_name > 1000 (possíveis billNumber errados)")
     print("=" * 80)
     
-    result2 = supabase.table('sienge_comissoes').select('*').execute()
+    result2 = supabase.table('comissoes_sienge_comissoes').select('*').execute()
     
     errados = []
     for c in result2.data:

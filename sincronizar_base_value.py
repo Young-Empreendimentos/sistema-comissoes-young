@@ -28,7 +28,7 @@ def sincronizar_base_value():
     
     # 1. Buscar todas as comissões do banco
     print("\n[1/2] Buscando comissões...")
-    result = supabase.table('sienge_comissoes').select('id,sienge_id,numero_contrato,broker_nome').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('id,sienge_id,numero_contrato,broker_nome').execute()
     
     comissoes = result.data or []
     print(f"      {len(comissoes)} comissões encontradas")
@@ -52,7 +52,7 @@ def sincronizar_base_value():
                 base_value = detalhe.get('baseValue')
                 
                 # Atualizar no banco - campo valor_comissao (usado para armazenar valor_a_vista/baseValue)
-                supabase.table('sienge_comissoes').update({
+                supabase.table('comissoes_sienge_comissoes').update({
                     'valor_comissao': base_value,
                     'atualizado_em': datetime.now().isoformat()
                 }).eq('id', c['id']).execute()

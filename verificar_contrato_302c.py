@@ -22,7 +22,7 @@ print("=" * 70)
 
 # 1. Verificar no Supabase
 print("\n[SUPABASE] Comissões do contrato 302C:")
-result = supabase.table('sienge_comissoes').select('*').ilike('numero_contrato', '%302%').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').ilike('numero_contrato', '%302%').execute()
 
 for c in (result.data or []):
     print(f"  - Sienge ID: {c.get('sienge_id')}")

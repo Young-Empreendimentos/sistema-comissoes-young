@@ -38,7 +38,7 @@ def main():
     
     # 2. Buscar todas as comissões do banco
     print("\n[2/3] Buscando comissões do Supabase...")
-    result = supabase.table('sienge_comissoes').select('id, sienge_id, broker_nome, numero_contrato, enterprise_name, installment_status').execute()
+    result = supabase.table('comissoes_sienge_comissoes').select('id, sienge_id, broker_nome, numero_contrato, enterprise_name, installment_status').execute()
     
     comissoes_banco = result.data or []
     print(f"      {len(comissoes_banco)} comissões no banco")
@@ -73,7 +73,7 @@ def main():
         # Se não está cancelada, marcar como cancelada
         if status_atual != 'CANCELLED':
             try:
-                supabase.table('sienge_comissoes').update({
+                supabase.table('comissoes_sienge_comissoes').update({
                     'installment_status': 'CANCELLED',
                     'atualizado_em': datetime.now().isoformat()
                 }).eq('id', c['id']).execute()

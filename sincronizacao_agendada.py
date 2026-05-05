@@ -84,7 +84,7 @@ def sincronizar_contratos():
                 }
                 
                 # Usar upsert para inserir ou atualizar
-                supabase.table('sienge_contratos').upsert(data, on_conflict='sienge_id').execute()
+                supabase.table('comissoes_sienge_contratos').upsert(data, on_conflict='sienge_id').execute()
                 sincronizados += 1
                     
             except Exception as e:
@@ -111,7 +111,7 @@ def sincronizar_comissoes():
         log(f"  {total_api} comissoes encontradas na API")
         
         # Buscar comissoes existentes no Supabase
-        result = supabase.table('sienge_comissoes').select('sienge_id').execute()
+        result = supabase.table('comissoes_sienge_comissoes').select('sienge_id').execute()
         existentes = set(int(item['sienge_id']) for item in (result.data or []) if item['sienge_id'])
         log(f"  {len(existentes)} comissoes ja cadastradas")
         
@@ -147,11 +147,11 @@ def sincronizar_comissoes():
                 }
                 
                 if sienge_id in existentes:
-                    supabase.table('sienge_comissoes').update(data).eq('sienge_id', str(sienge_id)).execute()
+                    supabase.table('comissoes_sienge_comissoes').update(data).eq('sienge_id', str(sienge_id)).execute()
                     atualizados += 1
                 else:
                     data['status_aprovacao'] = 'Pendente'
-                    supabase.table('sienge_comissoes').insert(data).execute()
+                    supabase.table('comissoes_sienge_comissoes').insert(data).execute()
                     novos += 1
                     
             except Exception as e:
@@ -202,12 +202,12 @@ def sincronizar_itbis():
                     }
                     
                     # Verificar se existe
-                    existing = supabase.table('sienge_itbi').select('id').eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
+                    existing = supabase.table('comissoes_sienge_itbi').select('id').eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
                     
                     if existing.data:
-                        supabase.table('sienge_itbi').update(data).eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
+                        supabase.table('comissoes_sienge_itbi').update(data).eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
                     else:
-                        supabase.table('sienge_itbi').insert(data).execute()
+                        supabase.table('comissoes_sienge_itbi').insert(data).execute()
                     
                     sincronizados += 1
                         
@@ -232,7 +232,7 @@ def sincronizar_base_value():
     
     try:
         # Buscar todas as comissões do banco
-        result = supabase.table('sienge_comissoes').select('id,sienge_id,numero_contrato').execute()
+        result = supabase.table('comissoes_sienge_comissoes').select('id,sienge_id,numero_contrato').execute()
         comissoes = result.data or []
         total = len(comissoes)
         log(f"  {total} comissoes para buscar baseValue")
@@ -253,7 +253,7 @@ def sincronizar_base_value():
                     base_value = detalhe.get('baseValue')
                     
                     # Atualizar no banco
-                    supabase.table('sienge_comissoes').update({
+                    supabase.table('comissoes_sienge_comissoes').update({
                         'valor_comissao': base_value,
                         'atualizado_em': datetime.now().isoformat()
                     }).eq('id', c['id']).execute()
@@ -311,12 +311,12 @@ def sincronizar_valores_pagos():
                     }
                     
                     # Verificar se existe
-                    existing = supabase.table('sienge_valor_pago').select('id').eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
+                    existing = supabase.table('comissoes_sienge_valor_pago').select('id').eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
                     
                     if existing.data:
-                        supabase.table('sienge_valor_pago').update(data).eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
+                        supabase.table('comissoes_sienge_valor_pago').update(data).eq('numero_contrato', str(numero)).eq('building_id', str(bid)).execute()
                     else:
-                        supabase.table('sienge_valor_pago').insert(data).execute()
+                        supabase.table('comissoes_sienge_valor_pago').insert(data).execute()
                     
                     sincronizados += 1
                         

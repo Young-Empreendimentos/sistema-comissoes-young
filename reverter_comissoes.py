@@ -16,7 +16,7 @@ print("REVERTENDO COMISSÕES PARA STATUS PENDENTE")
 print("=" * 70)
 
 # Buscar comissões que não estão pendentes
-result = supabase.table('sienge_comissoes')\
+result = supabase.table('comissoes_sienge_comissoes')\
     .select('id, status_aprovacao, broker_nome')\
     .neq('status_aprovacao', 'Pendente')\
     .execute()
@@ -33,7 +33,7 @@ if comissoes:
     revertidas = 0
     for c in comissoes:
         try:
-            supabase.table('sienge_comissoes')\
+            supabase.table('comissoes_sienge_comissoes')\
                 .update({
                     'status_aprovacao': 'Pendente',
                     'data_envio_aprovacao': None,

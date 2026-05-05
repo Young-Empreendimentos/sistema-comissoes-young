@@ -36,7 +36,7 @@ for c in commissions:
 # Verificar no Supabase
 print("\n" + "-" * 70)
 print("[SUPABASE] Comissões do contrato 161:")
-result = supabase.table('sienge_comissoes').select('id,sienge_id,broker_id,broker_nome,installment_status,status_aprovacao').eq('numero_contrato', '161').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('id,sienge_id,broker_id,broker_nome,installment_status,status_aprovacao').eq('numero_contrato', '161').execute()
 
 for c in (result.data or []):
     print(f"\n  DB ID: {c.get('id')}")

@@ -16,7 +16,7 @@ print("VERIFICANDO DADOS NO SUPABASE")
 print("=" * 70)
 
 # Buscar algumas comissões
-result = supabase.table('sienge_comissoes').select('*').limit(5).execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').limit(5).execute()
 
 if result.data:
     print(f"\nTotal de registros retornados: {len(result.data)}")
@@ -33,7 +33,7 @@ print("\n" + "=" * 70)
 print("VERIFICANDO REGISTROS COM commission_value PREENCHIDO")
 print("=" * 70)
 
-result2 = supabase.table('sienge_comissoes')\
+result2 = supabase.table('comissoes_sienge_comissoes')\
     .select('id, broker_nome, commission_value')\
     .not_.is_('commission_value', 'null')\
     .limit(5)\

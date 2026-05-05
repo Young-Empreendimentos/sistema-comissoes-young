@@ -192,7 +192,7 @@ def obter_gatilho_contrato(sync, numero_contrato, building_id, comissao_record=N
         # Se temos o registro da comissão, usar dele
         if not comissao_record:
             try:
-                comissao_result = sync.supabase.table('sienge_comissoes')\
+                comissao_result = sync.supabase.table('comissoes_sienge_comissoes')\
                     .select('regra_gatilho, regra_gatilho_id')\
                     .eq('numero_contrato', numero_contrato_str)\
                     .eq('building_id', building_id)\
@@ -208,7 +208,7 @@ def obter_gatilho_contrato(sync, numero_contrato, building_id, comissao_record=N
             regra_id = comissao_record.get('regra_gatilho_id')
             if regra_id:
                 try:
-                    regra_result = sync.supabase.table('regras_gatilho')\
+                    regra_result = sync.supabase.table('comissoes_regras_gatilho')\
                         .select('percentual, inclui_itbi, nome, tipo_regra')\
                         .eq('id', regra_id)\
                         .limit(1)\
@@ -325,7 +325,7 @@ def health_check():
     try:
         # Testar conexão com Supabase
         sync = SiengeSupabaseSync()
-        sync.supabase.table('usuarios').select('id').limit(1).execute()
+        sync.supabase.table('comissoes_usuarios').select('id').limit(1).execute()
         
         return jsonify({
             'status': 'healthy',
@@ -415,7 +415,7 @@ def listar_contratos():
         if building_id:
             contratos = sync.get_contratos_por_empreendimento(building_id)
         else:
-            result = sync.supabase.table('sienge_contratos').select('*').execute()
+            result = sync.supabase.table('comissoes_sienge_contratos').select('*').execute()
             contratos = result.data if result.data else []
         
         if contratos is None:
@@ -456,7 +456,7 @@ def get_contrato_info():
         
         # 3. Buscar comissao da tabela sienge_comissoes
         try:
-            comissao_result = sync.supabase.table('sienge_comissoes')\
+            comissao_result = sync.supabase.table('comissoes_sienge_comissoes')\
                 .select('*')\
                 .eq('numero_contrato', numero_contrato)\
                 .eq('building_id', building_id)\
@@ -605,7 +605,7 @@ def listar_corretores_filtro():
     try:
         sync = SiengeSupabaseSync()
         # Buscar corretores únicos das comissões
-        response = sync.supabase.table('sienge_comissoes').select('broker_nome').execute()
+        response = sync.supabase.table('comissoes_sienge_comissoes').select('broker_nome').execute()
         
         corretores_set = set()
         for c in response.data:
@@ -641,7 +641,7 @@ def buscar_corretor_por_documento():
         print(f"[API] Buscando corretor por documento: {documento_limpo}")
         
         # Buscar todos os corretores - usando apenas colunas que existem
-        result = sync.supabase.table('sienge_corretores')\
+        result = sync.supabase.table('comissoes_sienge_corretores')\
             .select('*')\
             .execute()
         
@@ -697,25 +697,25 @@ def contratos_por_corretor():
         
         # Calcular gatilho em tempo real para cada comissão (igual ao Visualizar Comissões)
         # Batch loading dos dados necessários
-        contratos_result = sync.supabase.table('sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total').execute()
+        contratos_result = sync.supabase.table('comissoes_sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total').execute()
         contratos_map = {}
         for ct in (contratos_result.data or []):
             key = (str(ct.get('numero_contrato', '')), str(ct.get('building_id', '')))
             contratos_map[key] = ct
         
-        itbi_result = sync.supabase.table('sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
+        itbi_result = sync.supabase.table('comissoes_sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
         itbi_map = {}
         for it in (itbi_result.data or []):
             key = (str(it.get('numero_contrato', '')), str(it.get('building_id', '')))
             itbi_map[key] = float(it.get('valor_itbi') or 0)
         
-        pago_result = sync.supabase.table('sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
+        pago_result = sync.supabase.table('comissoes_sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
         pago_map = {}
         for pg in (pago_result.data or []):
             key = (str(pg.get('numero_contrato', '')), str(pg.get('building_id', '')))
             pago_map[key] = float(pg.get('valor_pago') or 0)
         
-        regras_result = sync.supabase.table('regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
+        regras_result = sync.supabase.table('comissoes_regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
         regras_map = {}
         for rg in (regras_result.data or []):
             regras_map[rg['id']] = rg
@@ -873,14 +873,14 @@ def listar_contratos_sem_itbi():
         sync = SiengeSupabaseSync()
         
         # Buscar todos os contratos
-        contratos_result = sync.supabase.table('sienge_contratos')\
+        contratos_result = sync.supabase.table('comissoes_sienge_contratos')\
             .select('numero_contrato, building_id, nome_cliente, unidade, data_contrato, company_id')\
             .execute()
         
         contratos = contratos_result.data if contratos_result.data else []
         
         # Buscar ITBIs existentes
-        itbi_result = sync.supabase.table('sienge_itbi')\
+        itbi_result = sync.supabase.table('comissoes_sienge_itbi')\
             .select('numero_contrato, building_id')\
             .execute()
         
@@ -961,14 +961,14 @@ def limpar_cancelados():
         }
         
         # 1. Deletar comissões canceladas (pagas devem permanecer com status Aprovada)
-        result = sync.supabase.table('sienge_comissoes').select('id, installment_status').execute()
+        result = sync.supabase.table('comissoes_sienge_comissoes').select('id, installment_status').execute()
         canceladas = [c for c in (result.data or []) if 'CANCEL' in (c.get('installment_status') or '').upper()]
         
         resultado['canceladas_antes'] = len(canceladas)
         
         for c in canceladas:
             try:
-                sync.supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                sync.supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
                 resultado['canceladas_deletadas'] += 1
             except:
                 pass
@@ -981,13 +981,13 @@ def limpar_cancelados():
         resultado['pagas_atualizadas'] = 0
         for c in pagas:
             try:
-                sync.supabase.table('sienge_comissoes').update({'status_aprovacao': 'Aprovada'}).eq('id', c['id']).execute()
+                sync.supabase.table('comissoes_sienge_comissoes').update({'status_aprovacao': 'Aprovada'}).eq('id', c['id']).execute()
                 resultado['pagas_atualizadas'] += 1
             except:
                 pass
         
         # 2. Remover duplicatas
-        result2 = sync.supabase.table('sienge_comissoes').select('*').execute()
+        result2 = sync.supabase.table('comissoes_sienge_comissoes').select('*').execute()
         grupos = {}
         for c in (result2.data or []):
             chave = f"{c.get('numero_contrato')}_{c.get('unit_name')}_{c.get('building_id')}"
@@ -1004,7 +1004,7 @@ def limpar_cancelados():
             # Manter a primeira, deletar as outras
             for c in comissoes[1:]:
                 try:
-                    sync.supabase.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                    sync.supabase.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
                     resultado['duplicatas_deletadas'] += 1
                 except:
                     pass
@@ -1069,7 +1069,7 @@ def atualizar_perfil_usuario(user_id):
         novo_perfil = data.get('perfil')
         
         sync = SiengeSupabaseSync()
-        sync.supabase.table('usuarios')\
+        sync.supabase.table('comissoes_usuarios')\
             .update({'perfil': novo_perfil})\
             .eq('id', user_id)\
             .execute()
@@ -1156,7 +1156,7 @@ def atualizar_email_corretor(sienge_id):
         novo_email = data.get('email')
         
         sync = SiengeSupabaseSync()
-        sync.supabase.table('sienge_corretores')\
+        sync.supabase.table('comissoes_sienge_corretores')\
             .update({'email': novo_email})\
             .eq('sienge_id', sienge_id)\
             .execute()
@@ -1190,7 +1190,7 @@ def remover_acesso_corretor(sienge_id):
 def listar_regras_gatilho():
     try:
         sync = SiengeSupabaseSync()
-        result = sync.supabase.table('regras_gatilho')\
+        result = sync.supabase.table('comissoes_regras_gatilho')\
             .select('*')\
             .eq('ativo', True)\
             .order('nome')\
@@ -1219,7 +1219,7 @@ def criar_regra_gatilho():
             'criado_em': datetime.now().isoformat()
         }
         
-        result = sync.supabase.table('regras_gatilho').insert(nova_regra).execute()
+        result = sync.supabase.table('comissoes_regras_gatilho').insert(nova_regra).execute()
         
         if result.data:
             return jsonify({'status': 'sucesso', 'regra': result.data[0]}), 201
@@ -1246,7 +1246,7 @@ def atualizar_regra_gatilho(regra_id):
             'atualizado_em': datetime.now().isoformat()
         }
         
-        result = sync.supabase.table('regras_gatilho')\
+        result = sync.supabase.table('comissoes_regras_gatilho')\
             .update(atualizacao)\
             .eq('id', regra_id)\
             .execute()
@@ -1263,7 +1263,7 @@ def atualizar_regra_gatilho(regra_id):
 def excluir_regra_gatilho(regra_id):
     try:
         sync = SiengeSupabaseSync()
-        sync.supabase.table('regras_gatilho')\
+        sync.supabase.table('comissoes_regras_gatilho')\
             .update({'ativo': False})\
             .eq('id', regra_id)\
             .execute()
@@ -1285,7 +1285,7 @@ def atualizar_regra_comissao(comissao_id):
         sync = SiengeSupabaseSync()
         
         # Buscar a comissão atual
-        comissao_result = sync.supabase.table('sienge_comissoes')\
+        comissao_result = sync.supabase.table('comissoes_sienge_comissoes')\
             .select('*')\
             .eq('id', comissao_id)\
             .limit(1)\
@@ -1304,7 +1304,7 @@ def atualizar_regra_comissao(comissao_id):
         
         # Se selecionou uma regra, buscar e atualizar também o campo texto para compatibilidade
         if regra_gatilho_id:
-            regra_result = sync.supabase.table('regras_gatilho')\
+            regra_result = sync.supabase.table('comissoes_regras_gatilho')\
                 .select('percentual, inclui_itbi, nome')\
                 .eq('id', regra_gatilho_id)\
                 .limit(1)\
@@ -1322,7 +1322,7 @@ def atualizar_regra_comissao(comissao_id):
         else:
             update_data['regra_gatilho'] = '10% + ITBI'
         
-        sync.supabase.table('sienge_comissoes')\
+        sync.supabase.table('comissoes_sienge_comissoes')\
             .update(update_data)\
             .eq('id', comissao_id)\
             .execute()
@@ -1385,7 +1385,7 @@ def relatorio_comissoes():
         print(f"[API Relatório] Filtros - empreendimentos: {empreendimento_list}, corretores: {corretor_list}, regras: {regra_list}, auditorias: {auditoria_list}, data: {data_inicio} a {data_fim}")
         
         # Buscar todas as comissões (excluindo canceladas)
-        query = sync.supabase.table('sienge_comissoes').select('*')
+        query = sync.supabase.table('comissoes_sienge_comissoes').select('*')
         result = query.execute()
         comissoes = [c for c in (result.data or []) 
                      if 'cancel' not in (c.get('installment_status') or '').lower()]
@@ -1415,11 +1415,11 @@ def relatorio_comissoes():
             comissoes = [c for c in comissoes if str(c.get('regra_gatilho_id')) in regra_list]
         
         # Buscar regras de gatilho para associar
-        regras_result = sync.supabase.table('regras_gatilho').select('*').execute()
+        regras_result = sync.supabase.table('comissoes_regras_gatilho').select('*').execute()
         regras_dict = {r['id']: r for r in (regras_result.data or [])}
         
         # Buscar contratos para pegar dados do cliente, lote e data_contrato
-        contratos_result = sync.supabase.table('sienge_contratos').select('*').execute()
+        contratos_result = sync.supabase.table('comissoes_sienge_contratos').select('*').execute()
         contratos_dict = {c['numero_contrato']: c for c in (contratos_result.data or [])}
         
         # Filtrar por período de data do contrato
@@ -1549,7 +1549,7 @@ def listar_corretores_relatorio():
     
     try:
         sync = SiengeSupabaseSync()
-        result = sync.supabase.table('sienge_comissoes').select('broker_id, broker_nome').execute()
+        result = sync.supabase.table('comissoes_sienge_comissoes').select('broker_id, broker_nome').execute()
         
         corretores = {}
         for c in (result.data or []):
@@ -1574,7 +1574,7 @@ def listar_status_parcela():
     """Lista todos os status de parcela únicos no banco"""
     try:
         sync = SiengeSupabaseSync()
-        result = sync.supabase.table('sienge_comissoes').select('installment_status').execute()
+        result = sync.supabase.table('comissoes_sienge_comissoes').select('installment_status').execute()
         
         status_unicos = set()
         for c in (result.data or []):
@@ -1613,7 +1613,7 @@ def listar_todas_comissoes():
         print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, corretor: {corretor_param}")
         
         # Todas as parcelas (incl. canceladas no Sienge): excluir só pelo filtro de status da UI
-        result = sync.supabase.table('sienge_comissoes').select('*').execute()
+        result = sync.supabase.table('comissoes_sienge_comissoes').select('*').execute()
         comissoes = result.data if result.data else []
 
         # Filtrar por corretor (comparação exata pelo nome)
@@ -1657,28 +1657,28 @@ def listar_todas_comissoes():
         print(f"[API] Batch-loading dados para {len(comissoes)} comissões...")
         
         # 1. Carregar todos os contratos
-        contratos_result = sync.supabase.table('sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total,data_contrato').execute()
+        contratos_result = sync.supabase.table('comissoes_sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total,data_contrato').execute()
         contratos_map = {}
         for ct in (contratos_result.data or []):
             key = (str(ct.get('numero_contrato', '')), str(ct.get('building_id', '')))
             contratos_map[key] = ct
         
         # 2. Carregar todos os ITBIs
-        itbi_result = sync.supabase.table('sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
+        itbi_result = sync.supabase.table('comissoes_sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
         itbi_map = {}
         for it in (itbi_result.data or []):
             key = (str(it.get('numero_contrato', '')), str(it.get('building_id', '')))
             itbi_map[key] = float(it.get('valor_itbi') or 0)
         
         # 3. Carregar todos os valores pagos
-        pago_result = sync.supabase.table('sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
+        pago_result = sync.supabase.table('comissoes_sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
         pago_map = {}
         for pg in (pago_result.data or []):
             key = (str(pg.get('numero_contrato', '')), str(pg.get('building_id', '')))
             pago_map[key] = float(pg.get('valor_pago') or 0)
         
         # 4. Carregar todas as regras de gatilho
-        regras_result = sync.supabase.table('regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
+        regras_result = sync.supabase.table('comissoes_regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
         regras_map = {}
         for rg in (regras_result.data or []):
             regras_map[rg['id']] = rg
@@ -1891,12 +1891,12 @@ def criar_comissao_manual():
         try:
             nova_comissao_completa = nova_comissao.copy()
             nova_comissao_completa['observacoes'] = obs_completa
-            result = sync.supabase.table('sienge_comissoes').insert(nova_comissao_completa).execute()
+            result = sync.supabase.table('comissoes_sienge_comissoes').insert(nova_comissao_completa).execute()
         except Exception as e:
             print(f"[API] Insert com 'observacoes' falhou, tentando sem: {str(e)}")
             # Fallback: usar regra_gatilho para guardar metadados
             nova_comissao['regra_gatilho'] = obs_completa[:200]
-            result = sync.supabase.table('sienge_comissoes').insert(nova_comissao).execute()
+            result = sync.supabase.table('comissoes_sienge_comissoes').insert(nova_comissao).execute()
         
         if result.data:
             comissao_criada = result.data[0]
@@ -1904,7 +1904,7 @@ def criar_comissao_manual():
             # Criar registro de valor pago se valor_pago > 0
             if valor_pago > 0:
                 try:
-                    sync.supabase.table('sienge_valor_pago').insert({
+                    sync.supabase.table('comissoes_sienge_valor_pago').insert({
                         'numero_contrato': numero_contrato_manual,
                         'building_id': 'MANUAL',
                         'company_id': 0,
@@ -1945,13 +1945,13 @@ def cancelar_comissao(comissao_id):
     try:
         sync = SiengeSupabaseSync()
         
-        existe = sync.supabase.table('sienge_comissoes').select('id, installment_status, broker_nome, customer_name').eq('id', comissao_id).execute()
+        existe = sync.supabase.table('comissoes_sienge_comissoes').select('id, installment_status, broker_nome, customer_name').eq('id', comissao_id).execute()
         if not existe.data:
             return jsonify({'sucesso': False, 'erro': 'Comissão não encontrada'}), 404
         
         comissao = existe.data[0]
         
-        sync.supabase.table('sienge_comissoes').update({
+        sync.supabase.table('comissoes_sienge_comissoes').update({
             'installment_status': 'CANCELLED',
             'atualizado_em': datetime.now().isoformat()
         }).eq('id', comissao_id).execute()
@@ -2091,7 +2091,7 @@ def reverter_status_comissoes():
         sync = SiengeSupabaseSync()
         
         # Buscar comissões que não estão pendentes
-        result = sync.supabase.table('sienge_comissoes')\
+        result = sync.supabase.table('comissoes_sienge_comissoes')\
             .select('id, status_aprovacao, broker_nome')\
             .neq('status_aprovacao', 'Pendente')\
             .execute()
@@ -2104,7 +2104,7 @@ def reverter_status_comissoes():
         
         for c in comissoes_para_reverter:
             try:
-                sync.supabase.table('sienge_comissoes')\
+                sync.supabase.table('comissoes_sienge_comissoes')\
                     .update({
                         'status_aprovacao': 'Pendente',
                         'data_envio_aprovacao': None,
@@ -2139,7 +2139,7 @@ def reverter_status_comissoes():
 def listar_configuracoes_emails():
     try:
         sync = SiengeSupabaseSync()
-        result = sync.supabase.table('configuracoes_emails')\
+        result = sync.supabase.table('comissoes_configuracoes_emails')\
             .select('*')\
             .order('tipo')\
             .execute()
@@ -2163,7 +2163,7 @@ def atualizar_configuracoes_emails(tipo):
         emails = data.get('emails', [])
         
         sync = SiengeSupabaseSync()
-        sync.supabase.table('configuracoes_emails')\
+        sync.supabase.table('comissoes_configuracoes_emails')\
             .update({
                 'emails': emails,
                 'atualizado_por': current_user.id,

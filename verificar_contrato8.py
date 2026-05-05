@@ -21,7 +21,7 @@ print("VERIFICANDO CONTRATO 8 - MORADA DA COXILHA")
 print("=" * 80)
 
 # Buscar no banco
-result = supabase.table('sienge_comissoes').select('*').eq('numero_contrato', '8').ilike('enterprise_name', '%Morada%').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').eq('numero_contrato', '8').ilike('enterprise_name', '%Morada%').execute()
 
 print("\n--- NO BANCO (Supabase) ---")
 if result.data:

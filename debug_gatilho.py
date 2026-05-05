@@ -8,7 +8,7 @@ supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 print('Buscando dados do contrato 198 Erico Verissimo...')
 
 # Contrato
-contrato = supabase.table('sienge_contratos').select('*').eq('numero_contrato', '198').eq('building_id', 2010).execute()
+contrato = supabase.table('comissoes_sienge_contratos').select('*').eq('numero_contrato', '198').eq('building_id', 2010).execute()
 if contrato.data:
     c = contrato.data[0]
     print(f"Contrato: {c.get('numero_contrato')}")
@@ -16,19 +16,19 @@ if contrato.data:
     print(f"  valor_total: {c.get('valor_total')}")
 
 # ITBI
-itbi = supabase.table('sienge_itbi').select('*').eq('numero_contrato', '198').eq('building_id', '2010').execute()
+itbi = supabase.table('comissoes_sienge_itbi').select('*').eq('numero_contrato', '198').eq('building_id', '2010').execute()
 print(f"ITBI encontrado: {len(itbi.data or [])}")
 if itbi.data:
     print(f"  valor_itbi: {itbi.data[0].get('valor_itbi')}")
 
 # Valor pago
-vp = supabase.table('sienge_valor_pago').select('*').eq('numero_contrato', '198').eq('building_id', '2010').execute()
+vp = supabase.table('comissoes_sienge_valor_pago').select('*').eq('numero_contrato', '198').eq('building_id', '2010').execute()
 print(f"Valor pago encontrado: {len(vp.data or [])}")
 if vp.data:
     print(f"  valor_pago: {vp.data[0].get('valor_pago')}")
 
 # Comissao
-comissao = supabase.table('sienge_comissoes').select('*').eq('numero_contrato', '198').eq('building_id', 2010).execute()
+comissao = supabase.table('comissoes_sienge_comissoes').select('*').eq('numero_contrato', '198').eq('building_id', 2010).execute()
 print(f"Comissoes encontradas: {len(comissao.data or [])}")
 if comissao.data:
     for cm in comissao.data:

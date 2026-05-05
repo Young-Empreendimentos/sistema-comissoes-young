@@ -23,7 +23,7 @@ print("=" * 60)
 
 # Buscar todas as comissões do banco
 print("\n[1/2] Buscando comissões...")
-result = supabase.table('sienge_comissoes').select('id,sienge_id,numero_contrato,broker_nome').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('id,sienge_id,numero_contrato,broker_nome').execute()
 
 comissoes = result.data or []
 print(f"      {len(comissoes)} comissões encontradas")
@@ -47,7 +47,7 @@ for i, c in enumerate(comissoes):
             base_value = detalhe.get('baseValue')
             
             # Atualizar no banco
-            supabase.table('sienge_comissoes').update({
+            supabase.table('comissoes_sienge_comissoes').update({
                 'valor_comissao': base_value,
                 'atualizado_em': datetime.now().isoformat()
             }).eq('id', c['id']).execute()

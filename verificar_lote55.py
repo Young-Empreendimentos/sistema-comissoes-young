@@ -10,7 +10,7 @@ load_dotenv()
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 
 # Buscar por lote 55 e Morada da Coxilha
-result = supabase.table('sienge_comissoes').select('*').eq('unit_name', '55').ilike('enterprise_name', '%Morada%').execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').eq('unit_name', '55').ilike('enterprise_name', '%Morada%').execute()
 
 print("=== COMISSÕES DO LOTE 55 - MORADA DA COXILHA ===")
 if result.data:

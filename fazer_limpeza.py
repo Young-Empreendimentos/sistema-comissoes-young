@@ -23,19 +23,19 @@ def main():
         sb = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
         
         # 1. Contar e deletar canceladas
-        result = sb.table('sienge_comissoes').select('id, installment_status').execute()
+        result = sb.table('comissoes_sienge_comissoes').select('id, installment_status').execute()
         canceladas = [c for c in (result.data or []) if 'CANCEL' in (c.get('installment_status') or '').upper()]
         resultado['canceladas_antes'] = len(canceladas)
         
         for c in canceladas:
             try:
-                sb.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                sb.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
                 resultado['canceladas_deletadas'] += 1
             except:
                 pass
         
         # 2. Buscar duplicatas
-        result2 = sb.table('sienge_comissoes').select('*').execute()
+        result2 = sb.table('comissoes_sienge_comissoes').select('*').execute()
         grupos = {}
         for c in (result2.data or []):
             chave = f"{c.get('numero_contrato')}_{c.get('unit_name')}_{c.get('building_id')}"
@@ -50,7 +50,7 @@ def main():
             comissoes.sort(key=lambda x: ('CANCEL' in (x.get('installment_status') or '').upper(), x.get('id', 0)))
             for c in comissoes[1:]:
                 try:
-                    sb.table('sienge_comissoes').delete().eq('id', c['id']).execute()
+                    sb.table('comissoes_sienge_comissoes').delete().eq('id', c['id']).execute()
                     resultado['duplicatas_deletadas'] += 1
                 except:
                     pass

@@ -39,7 +39,7 @@ def sincronizar_valores_pagos():
     try:
         # Buscar valores pagos existentes no Supabase
         print("\n[1/3] Verificando valores pagos existentes no Supabase...")
-        result_vp = supabase.table('sienge_valor_pago')\
+        result_vp = supabase.table('comissoes_sienge_valor_pago')\
             .select('numero_contrato, building_id')\
             .execute()
         
@@ -96,7 +96,7 @@ def sincronizar_valores_pagos():
                     
                     if ja_existe:
                         # Atualizar existente
-                        supabase.table('sienge_valor_pago')\
+                        supabase.table('comissoes_sienge_valor_pago')\
                             .update(data)\
                             .eq('numero_contrato', str(numero))\
                             .eq('building_id', str(bid))\
@@ -104,7 +104,7 @@ def sincronizar_valores_pagos():
                         atualizados += 1
                     else:
                         # Inserir novo
-                        supabase.table('sienge_valor_pago').insert(data).execute()
+                        supabase.table('comissoes_sienge_valor_pago').insert(data).execute()
                         novos += 1
                         print(f"[{idx}/{total_contratos}] [NOVO] Contrato {numero} (Emp {bid}): R$ {valor_pago:,.2f}")
                 else:

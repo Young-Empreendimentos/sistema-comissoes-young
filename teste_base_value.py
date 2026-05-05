@@ -22,7 +22,7 @@ print("TESTE - BUSCAR baseValue")
 print("=" * 60)
 
 # Buscar algumas comissões do banco
-result = supabase.table('sienge_comissoes').select('*').limit(3).execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').limit(3).execute()
 
 print("\nCampos que contêm 'valor' ou 'value':")
 if result.data:

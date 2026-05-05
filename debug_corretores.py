@@ -15,7 +15,7 @@ from supabase import create_client
 
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
 
-result = supabase.table('sienge_comissoes').select('*').limit(5).execute()
+result = supabase.table('comissoes_sienge_comissoes').select('*').limit(5).execute()
 
 if result.data:
     print("Campos disponíveis:", list(result.data[0].keys()))
