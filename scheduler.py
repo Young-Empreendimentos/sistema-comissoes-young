@@ -165,8 +165,11 @@ def sincronizacao_diaria():
         erro_msg = traceback.format_exc()
         traceback.print_exc()
     
-    # Enviar e-mail de notificação
-    enviar_email_notificacao(sucesso, resultado, erro_msg)
+    # Enviar e-mail de notificação apenas em caso de erro
+    if not sucesso:
+        enviar_email_notificacao(sucesso, resultado, erro_msg)
+    else:
+        print(f"[E-mail] Sincronização OK - e-mail não enviado (somente notifica em caso de erro)")
 
 def sync_manual():
     """Executa sincronização manualmente (para testes)"""
