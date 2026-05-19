@@ -74,6 +74,26 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 auth_manager = AuthManager()
 
 
+def fetch_all_paginated(supabase_client, table_name: str, columns: str = '*', batch_size: int = 1000) -> list:
+    """Busca todos os registros de uma tabela com paginação automática.
+    O Supabase tem limite de 1000 registros por query, então precisamos paginar.
+    Usa offset+limit que funciona melhor que range().
+    """
+    all_records = []
+    offset = 0
+    
+    while True:
+        result = supabase_client.table(table_name).select(columns).limit(batch_size).offset(offset).execute()
+        if not result.data:
+            break
+        all_records.extend(result.data)
+        if len(result.data) < batch_size:
+            break
+        offset += batch_size
+    
+    return all_records
+
+
 def extrair_meta_manual(comissao: dict) -> dict:
     """Extrai valor_gatilho e valor_pago dos metadados armazenados em observacoes/regra_gatilho de comissões manuais.
     Formato esperado: [GATILHO:XXX][VALOR_PAGO:YYY] texto livre
@@ -415,8 +435,7 @@ def listar_contratos():
         if building_id:
             contratos = sync.get_contratos_por_empreendimento(building_id)
         else:
-            result = sync.supabase.table('comissoes_sienge_contratos').select('*').execute()
-            contratos = result.data if result.data else []
+            contratos = fetch_all_paginated(sync.supabase, 'comissoes_sienge_contratos', '*')
         
         if contratos is None:
             contratos = []
@@ -698,28 +717,29 @@ def contratos_por_corretor():
         comissoes = sync.get_comissoes_por_corretor(corretor_id=corretor_id, corretor_nome=corretor_nome)
         
         # Calcular gatilho em tempo real para cada comissão (igual ao Visualizar Comissões)
-        # Batch loading dos dados necessários
-        contratos_result = sync.supabase.table('comissoes_sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total').execute()
+        # Batch loading dos dados necessários (com paginação para evitar limite de 1000 do Supabase)
+        contratos_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_contratos', 'numero_contrato,building_id,valor_a_vista,valor_total')
         contratos_map = {}
-        for ct in (contratos_result.data or []):
+        for ct in contratos_data:
             key = (str(ct.get('numero_contrato', '')), str(ct.get('building_id', '')))
             contratos_map[key] = ct
         
-        itbi_result = sync.supabase.table('comissoes_sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
+        itbi_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_itbi', 'numero_contrato,building_id,valor_itbi')
         itbi_map = {}
-        for it in (itbi_result.data or []):
+        for it in itbi_data:
             key = (str(it.get('numero_contrato', '')), str(it.get('building_id', '')))
             itbi_map[key] = float(it.get('valor_itbi') or 0)
         
-        pago_result = sync.supabase.table('comissoes_sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
+        # IMPORTANTE: Supabase tem limite de 1000 registros por query, usar paginação
+        pago_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_valor_pago', 'numero_contrato,building_id,valor_pago')
         pago_map = {}
-        for pg in (pago_result.data or []):
+        for pg in pago_data:
             key = (str(pg.get('numero_contrato', '')), str(pg.get('building_id', '')))
             pago_map[key] = float(pg.get('valor_pago') or 0)
         
-        regras_result = sync.supabase.table('comissoes_regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
+        regras_data = fetch_all_paginated(sync.supabase, 'comissoes_regras_gatilho', 'id,percentual,inclui_itbi,nome')
         regras_map = {}
-        for rg in (regras_result.data or []):
+        for rg in regras_data:
             regras_map[rg['id']] = rg
         
         # Calcular gatilho para cada comissão
@@ -755,6 +775,16 @@ def contratos_por_corretor():
                 contrato = contratos_map.get(key)
                 valor_itbi = itbi_map.get(key, 0)
                 valor_pago = pago_map.get(key, 0)
+                
+                # Data do contrato: usar do contrato ou fallback para data da comissão
+                if contrato:
+                    c['data_contrato'] = contrato.get('data_contrato')
+                else:
+                    c['data_contrato'] = c.get('commission_date') or c.get('due_date')
+                
+                # Garantir que unit_name venha do contrato se não estiver na comissão
+                if not c.get('unit_name') and contrato:
+                    c['unit_name'] = contrato.get('unidade') or contrato.get('unit_name')
                 
                 # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
                 valor_a_vista = float(c.get('valor_comissao') or 0)
@@ -793,7 +823,13 @@ def contratos_por_corretor():
                 else:
                     valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
                 
-                atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                # Verificar se atingiu gatilho (None se não há dados suficientes)
+                if valor_a_vista == 0 and not contrato:
+                    atingiu_gatilho = None
+                    c['dados_incompletos'] = True
+                else:
+                    atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                    c['dados_incompletos'] = False
                 
                 c['valor_pago'] = valor_pago
                 c['valor_itbi'] = valor_itbi
@@ -874,21 +910,16 @@ def listar_contratos_sem_itbi():
     try:
         sync = SiengeSupabaseSync()
         
-        # Buscar todos os contratos
-        contratos_result = sync.supabase.table('comissoes_sienge_contratos')\
-            .select('numero_contrato, building_id, nome_cliente, unidade, data_contrato, company_id')\
-            .execute()
+        # Buscar todos os contratos (com paginação)
+        contratos = fetch_all_paginated(sync.supabase, 'comissoes_sienge_contratos', 
+            'numero_contrato, building_id, nome_cliente, unidade, data_contrato, company_id')
         
-        contratos = contratos_result.data if contratos_result.data else []
-        
-        # Buscar ITBIs existentes
-        itbi_result = sync.supabase.table('comissoes_sienge_itbi')\
-            .select('numero_contrato, building_id')\
-            .execute()
+        # Buscar ITBIs existentes (com paginação)
+        itbi_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_itbi', 'numero_contrato, building_id')
         
         # Criar set de contratos que já têm ITBI
         itbi_existentes = set()
-        for item in (itbi_result.data or []):
+        for item in itbi_data:
             chave = f"{item.get('numero_contrato')}_{item.get('building_id')}"
             itbi_existentes.add(chave)
         
@@ -991,9 +1022,9 @@ def limpar_cancelados():
                 pass
         
         # 2. Remover duplicatas
-        result2 = sync.supabase.table('comissoes_sienge_comissoes').select('*').execute()
+        comissoes_all = fetch_all_paginated(sync.supabase, 'comissoes_sienge_comissoes', '*')
         grupos = {}
-        for c in (result2.data or []):
+        for c in comissoes_all:
             chave = f"{c.get('numero_contrato')}_{c.get('unit_name')}_{c.get('building_id')}"
             if chave not in grupos:
                 grupos[chave] = []
@@ -1419,12 +1450,12 @@ def relatorio_comissoes():
             comissoes = [c for c in comissoes if str(c.get('regra_gatilho_id')) in regra_list]
         
         # Buscar regras de gatilho para associar
-        regras_result = sync.supabase.table('comissoes_regras_gatilho').select('*').execute()
-        regras_dict = {r['id']: r for r in (regras_result.data or [])}
+        regras_data = fetch_all_paginated(sync.supabase, 'comissoes_regras_gatilho', '*')
+        regras_dict = {r['id']: r for r in regras_data}
         
         # Buscar contratos para pegar dados do cliente, lote e data_contrato
-        contratos_result = sync.supabase.table('comissoes_sienge_contratos').select('*').execute()
-        contratos_dict = {c['numero_contrato']: c for c in (contratos_result.data or [])}
+        contratos_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_contratos', '*')
+        contratos_dict = {c['numero_contrato']: c for c in contratos_data}
         
         # Filtrar por período de data do contrato
         if data_inicio or data_fim:
@@ -1617,8 +1648,7 @@ def listar_todas_comissoes():
         print(f"[API] Filtros recebidos - status_parcela: {status_parcela_list}, status_aprovacao: {status_aprovacao_list}, gatilho: {gatilho_list}, corretor: {corretor_param}")
         
         # Todas as parcelas (incl. canceladas no Sienge): excluir só pelo filtro de status da UI
-        result = sync.supabase.table('comissoes_sienge_comissoes').select('*').execute()
-        comissoes = result.data if result.data else []
+        comissoes = fetch_all_paginated(sync.supabase, 'comissoes_sienge_comissoes', '*')
 
         # Filtrar por corretor (comparação exata pelo nome)
         if corretor_param:
@@ -1657,34 +1687,34 @@ def listar_todas_comissoes():
         comissoes.sort(key=lambda x: x.get('commission_date') or '', reverse=True)
         
         # ===== BATCH LOADING: carregar todos os dados auxiliares de uma vez =====
-        # Em vez de N queries por comissão, fazemos apenas 4 queries no total
+        # Em vez de N queries por comissão, fazemos queries paginadas no total
         print(f"[API] Batch-loading dados para {len(comissoes)} comissões...")
         
-        # 1. Carregar todos os contratos
-        contratos_result = sync.supabase.table('comissoes_sienge_contratos').select('numero_contrato,building_id,valor_a_vista,valor_total,data_contrato').execute()
+        # 1. Carregar todos os contratos (com paginação)
+        contratos_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_contratos', 'numero_contrato,building_id,valor_a_vista,valor_total,data_contrato')
         contratos_map = {}
-        for ct in (contratos_result.data or []):
+        for ct in contratos_data:
             key = (str(ct.get('numero_contrato', '')), str(ct.get('building_id', '')))
             contratos_map[key] = ct
         
-        # 2. Carregar todos os ITBIs
-        itbi_result = sync.supabase.table('comissoes_sienge_itbi').select('numero_contrato,building_id,valor_itbi').execute()
+        # 2. Carregar todos os ITBIs (com paginação)
+        itbi_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_itbi', 'numero_contrato,building_id,valor_itbi')
         itbi_map = {}
-        for it in (itbi_result.data or []):
+        for it in itbi_data:
             key = (str(it.get('numero_contrato', '')), str(it.get('building_id', '')))
             itbi_map[key] = float(it.get('valor_itbi') or 0)
         
-        # 3. Carregar todos os valores pagos
-        pago_result = sync.supabase.table('comissoes_sienge_valor_pago').select('numero_contrato,building_id,valor_pago').execute()
+        # 3. Carregar todos os valores pagos (com paginação)
+        pago_data = fetch_all_paginated(sync.supabase, 'comissoes_sienge_valor_pago', 'numero_contrato,building_id,valor_pago')
         pago_map = {}
-        for pg in (pago_result.data or []):
+        for pg in pago_data:
             key = (str(pg.get('numero_contrato', '')), str(pg.get('building_id', '')))
             pago_map[key] = float(pg.get('valor_pago') or 0)
         
         # 4. Carregar todas as regras de gatilho
-        regras_result = sync.supabase.table('comissoes_regras_gatilho').select('id,percentual,inclui_itbi,nome').execute()
+        regras_data = fetch_all_paginated(sync.supabase, 'comissoes_regras_gatilho', 'id,percentual,inclui_itbi,nome')
         regras_map = {}
-        for rg in (regras_result.data or []):
+        for rg in regras_data:
             regras_map[rg['id']] = rg
         
         print(f"[API] Batch-load concluído: {len(contratos_map)} contratos, {len(itbi_map)} ITBIs, {len(pago_map)} pagos, {len(regras_map)} regras")
@@ -1724,7 +1754,17 @@ def listar_todas_comissoes():
                 contrato = contratos_map.get(key)
                 valor_itbi = itbi_map.get(key, 0)
                 valor_pago = pago_map.get(key, 0)
-                c['data_contrato'] = contrato.get('data_contrato') if contrato else None
+                
+                # Data do contrato: usar do contrato ou fallback para data da comissão
+                if contrato:
+                    c['data_contrato'] = contrato.get('data_contrato')
+                else:
+                    # Fallback: usar commission_date ou due_date da comissão
+                    c['data_contrato'] = c.get('commission_date') or c.get('due_date')
+                
+                # Garantir que unit_name venha do contrato se não estiver na comissão
+                if not c.get('unit_name') and contrato:
+                    c['unit_name'] = contrato.get('unidade') or contrato.get('unit_name')
                 
                 # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
                 valor_a_vista = float(c.get('valor_comissao') or 0)
@@ -1763,7 +1803,14 @@ def listar_todas_comissoes():
                 else:
                     valor_gatilho = calcular_valor_gatilho(valor_a_vista, valor_itbi, regra_gatilho_texto)
                 
-                atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                # Verificar se atingiu gatilho (None se não há dados suficientes)
+                if valor_a_vista == 0 and not contrato:
+                    # Sem dados para calcular - marcar como dados incompletos
+                    atingiu_gatilho = None
+                    c['dados_incompletos'] = True
+                else:
+                    atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                    c['dados_incompletos'] = False
                 
                 c['valor_pago'] = valor_pago
                 c['valor_itbi'] = valor_itbi
