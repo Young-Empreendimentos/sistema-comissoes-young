@@ -767,10 +767,24 @@ function renderizarTabelaComissoes(comissoes) {
     
     tbody.innerHTML = comissoes.map(c => {
         const atingiuGatilho = c.atingiu_gatilho;
+        const dadosIncompletos = c.dados_incompletos === true || atingiuGatilho === null;
         const statusAprovacao = c.status_aprovacao || 'Pendente';
         const statusAprovacaoExibicao = traduzirStatusAprovacao(statusAprovacao);
         const isPendente = statusAprovacao === 'Pendente';
-        const destacar = isPendente && atingiuGatilho;
+        const destacar = isPendente && atingiuGatilho === true;
+        
+        // Determinar texto e classe do gatilho
+        let gatilhoTexto, gatilhoClass;
+        if (dadosIncompletos) {
+            gatilhoTexto = 'N/A';
+            gatilhoClass = 'gatilho-na';
+        } else if (atingiuGatilho) {
+            gatilhoTexto = 'SIM';
+            gatilhoClass = 'gatilho-sim';
+        } else {
+            gatilhoTexto = 'NÃO';
+            gatilhoClass = 'gatilho-nao';
+        }
         
         // Gerar dropdown de regras
         const dropdownRegras = gerarDropdownRegras(c.id, c.regra_gatilho_id, c.regra_gatilho);
@@ -797,8 +811,8 @@ function renderizarTabelaComissoes(comissoes) {
                 <td>${formatCurrency(c.commission_value || 0)}</td>
                 <td>${formatCurrency(c.valor_pago || 0)}</td>
                 <td>${dropdownRegras}</td>
-                <td id="valor-gatilho-${c.id}">${formatCurrency(c.valor_gatilho)}</td>
-                <td id="atingiu-gatilho-${c.id}" class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
+                <td id="valor-gatilho-${c.id}">${dadosIncompletos ? 'N/A' : formatCurrency(c.valor_gatilho)}</td>
+                <td id="atingiu-gatilho-${c.id}" class="${gatilhoClass}">${gatilhoTexto}</td>
                 <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacaoExibicao}</span></td>
                 <td style="text-align: center;">
                     <div style="display: flex; gap: 0.3rem; justify-content: center; align-items: center;">
@@ -884,14 +898,20 @@ async function alterarRegraComissao(comissaoId, regraId) {
         
         if (response.ok && data.sucesso) {
             // Atualizar a célula de valor do gatilho
+            const dadosIncompletos = data.atingiu_gatilho === null || data.dados_incompletos === true;
             if (valorGatilhoCell) {
-                valorGatilhoCell.textContent = formatCurrency(data.valor_gatilho);
+                valorGatilhoCell.textContent = dadosIncompletos ? 'N/A' : formatCurrency(data.valor_gatilho);
             }
             
             // Atualizar a célula "Atingiu?"
             if (atingiuGatilhoCell) {
-                atingiuGatilhoCell.textContent = data.atingiu_gatilho ? 'SIM' : 'NÃO';
-                atingiuGatilhoCell.className = data.atingiu_gatilho ? 'gatilho-sim' : 'gatilho-nao';
+                if (dadosIncompletos) {
+                    atingiuGatilhoCell.textContent = 'N/A';
+                    atingiuGatilhoCell.className = 'gatilho-na';
+                } else {
+                    atingiuGatilhoCell.textContent = data.atingiu_gatilho ? 'SIM' : 'NÃO';
+                    atingiuGatilhoCell.className = data.atingiu_gatilho ? 'gatilho-sim' : 'gatilho-nao';
+                }
             }
             
             // Atualizar destaque da linha se necessário
@@ -899,7 +919,7 @@ async function alterarRegraComissao(comissaoId, regraId) {
             if (linha) {
                 const statusCell = linha.querySelector('.badge-status');
                 const isPendente = statusCell && statusCell.textContent.toLowerCase().includes('pendente');
-                if (isPendente && data.atingiu_gatilho) {
+                if (isPendente && data.atingiu_gatilho === true) {
                     linha.classList.add('highlight-pendente-gatilho');
                 } else {
                     linha.classList.remove('highlight-pendente-gatilho');
@@ -1030,8 +1050,22 @@ function renderizarTabelaComissoesGerenciar(comissoes) {
     
     tbody.innerHTML = comissoes.map(c => {
         const atingiuGatilho = c.atingiu_gatilho;
+        const dadosIncompletos = c.dados_incompletos === true || atingiuGatilho === null;
         const statusAprovacao = c.status_aprovacao || 'Pendente';
         const statusAprovacaoExibicao = traduzirStatusAprovacao(statusAprovacao);
+        
+        // Determinar texto e classe do gatilho
+        let gatilhoTexto, gatilhoClass;
+        if (dadosIncompletos) {
+            gatilhoTexto = 'N/A';
+            gatilhoClass = 'gatilho-na';
+        } else if (atingiuGatilho) {
+            gatilhoTexto = 'SIM';
+            gatilhoClass = 'gatilho-sim';
+        } else {
+            gatilhoTexto = 'NÃO';
+            gatilhoClass = 'gatilho-nao';
+        }
         
         // Gerar dropdown de regras
         const dropdownRegras = gerarDropdownRegrasGer(c.id, c.regra_gatilho_id, c.regra_gatilho);
@@ -1047,8 +1081,8 @@ function renderizarTabelaComissoesGerenciar(comissoes) {
                 <td>${formatCurrency(c.commission_value || 0)}</td>
                 <td>${formatCurrency(c.valor_pago || 0)}</td>
                 <td>${dropdownRegras}</td>
-                <td id="valor-gatilho-ger-${c.id}">${formatCurrency(c.valor_gatilho)}</td>
-                <td id="atingiu-gatilho-ger-${c.id}" class="${atingiuGatilho ? 'gatilho-sim' : 'gatilho-nao'}">${atingiuGatilho ? 'SIM' : 'NÃO'}</td>
+                <td id="valor-gatilho-ger-${c.id}">${dadosIncompletos ? 'N/A' : formatCurrency(c.valor_gatilho)}</td>
+                <td id="atingiu-gatilho-ger-${c.id}" class="${gatilhoClass}">${gatilhoTexto}</td>
                 <td><span class="badge-status ${getStatusAprovacaoClass(statusAprovacao)}">${statusAprovacaoExibicao}</span></td>
             </tr>
         `;
@@ -1101,14 +1135,20 @@ async function alterarRegraComissaoGer(comissaoId, regraId) {
         
         if (response.ok && data.sucesso) {
             // Atualizar a célula de valor do gatilho
+            const dadosIncompletos = data.atingiu_gatilho === null || data.dados_incompletos === true;
             if (valorGatilhoCell) {
-                valorGatilhoCell.textContent = formatCurrency(data.valor_gatilho);
+                valorGatilhoCell.textContent = dadosIncompletos ? 'N/A' : formatCurrency(data.valor_gatilho);
             }
             
             // Atualizar a célula "Atingiu?"
             if (atingiuGatilhoCell) {
-                atingiuGatilhoCell.textContent = data.atingiu_gatilho ? 'SIM' : 'NÃO';
-                atingiuGatilhoCell.className = data.atingiu_gatilho ? 'gatilho-sim' : 'gatilho-nao';
+                if (dadosIncompletos) {
+                    atingiuGatilhoCell.textContent = 'N/A';
+                    atingiuGatilhoCell.className = 'gatilho-na';
+                } else {
+                    atingiuGatilhoCell.textContent = data.atingiu_gatilho ? 'SIM' : 'NÃO';
+                    atingiuGatilhoCell.className = data.atingiu_gatilho ? 'gatilho-sim' : 'gatilho-nao';
+                }
             }
             
             // Mostrar toast de sucesso

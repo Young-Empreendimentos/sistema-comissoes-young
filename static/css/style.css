@@ -1117,6 +1117,11 @@ input[type="checkbox"]:focus-visible {
     color: var(--color-error);
 }
 
+.gatilho-na {
+    color: #888;
+    font-style: italic;
+}
+
 /* ================================
    ALERTS
    ================================ */
