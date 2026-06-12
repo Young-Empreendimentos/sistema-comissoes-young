@@ -1,0 +1,23 @@
+name: Deploy para Hetzner
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Atualizar servidor via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/youngapp/sistema-comissoes-young
+            git pull origin main
+            ./venv/bin/pip install -r requirements.txt
+            systemctl restart sistema-comissoes-young
+            systemctl restart sistema-comissoes-young-scheduler
+            systemctl is-active sistema-comissoes-young
