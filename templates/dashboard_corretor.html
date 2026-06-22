@@ -16,7 +16,7 @@
         .welcome-corretor {
             text-align: center;
             padding: 2rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
         }
 
         .welcome-corretor h1 {
@@ -32,7 +32,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1.5rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
         }
 
         .stat-card {
@@ -44,17 +44,63 @@
             border-left: 4px solid #FE5009;
         }
 
+        .stat-card.recebido { border-left-color: #60a5fa; }
+        .stat-card.areceber { border-left-color: #34d399; }
+        .stat-card.aguardando { border-left-color: #fbbf24; }
+
         .stat-value {
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: 700;
             color: #FE5009;
         }
+        .stat-card.recebido .stat-value { color: #60a5fa; }
+        .stat-card.areceber .stat-value { color: #34d399; }
+        .stat-card.aguardando .stat-value { color: #fbbf24; }
 
         .stat-label {
             color: #D7D7D9;
             font-size: 0.9rem;
             margin-top: 0.5rem;
         }
+
+        /* ===== Filtros ===== */
+        .filtros-corretor {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .situacao-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .situacao-tab {
+            background: #323232;
+            color: #D7D7D9;
+            border: 1px solid #444;
+            padding: 0.45rem 0.9rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .situacao-tab:hover { border-color: #FE5009; }
+        .situacao-tab.ativo {
+            background: #FE5009;
+            color: #fff;
+            border-color: #FE5009;
+        }
+        .filtro-input, .filtro-select {
+            background: #323232;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 0.45rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+        .filtro-input { min-width: 200px; flex: 1; }
 
         .contratos-lista {
             display: flex;
@@ -80,7 +126,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 0.5rem;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
         }
 
         .contrato-numero {
@@ -124,6 +172,37 @@
             color: #10b981;
         }
 
+        /* ===== Faixa de situação (quando vou receber) ===== */
+        .situacao-faixa {
+            margin-top: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .situacao-faixa.aguardando { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .situacao-faixa.liberada  { background: rgba(16,185,129,0.12); color: #34d399; }
+        .situacao-faixa.areceber  { background: rgba(16,185,129,0.12); color: #34d399; }
+        .situacao-faixa.recebida  { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .situacao-faixa.cancelada { background: rgba(239,68,68,0.12); color: #f87171; }
+
+        .progress-bar {
+            background: #444;
+            border-radius: 10px;
+            height: 10px;
+            overflow: hidden;
+            margin: 0.5rem 0 0.35rem;
+        }
+        .progress-fill {
+            background: #fbbf24;
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.4s ease;
+        }
+        .progress-legenda {
+            font-size: 0.8rem;
+            color: #bbb;
+        }
+
         .status-badge {
             display: inline-block;
             padding: 0.25rem 0.75rem;
@@ -131,64 +210,16 @@
             font-size: 0.8rem;
             font-weight: 500;
         }
+        .status-pendente { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .status-aprovada { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .status-paga { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-cancelada { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .status-liberada { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .gatilho-nao-info { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
 
-        .status-pendente {
-            background: rgba(245, 158, 11, 0.2);
-            color: #fbbf24;
-        }
-
-        .status-aprovada {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
-        }
-
-        .status-paga {
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-        }
-
-        .status-cancelada {
-            background: rgba(239, 68, 68, 0.2);
-            color: #f87171;
-        }
-
-        .status-vencida {
-            background: rgba(239, 68, 68, 0.2);
-            color: #f87171;
-        }
-
-        .status-aberta {
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-        }
-
-        .status-liberada {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
-        }
-
-        .gatilho-nao-info {
-            background: rgba(148, 163, 184, 0.2);
-            color: #94a3b8;
-        }
-
-        .loading-corretor {
-            text-align: center;
-            padding: 3rem;
-            color: #999;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: #999;
-        }
-
-        .empty-state-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            color: #FE5009;
-        }
+        .loading-corretor { text-align: center; padding: 3rem; color: #999; }
+        .empty-state { text-align: center; padding: 3rem; color: #999; }
+        .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; color: #FE5009; }
     </style>
 </head>
 <body>
@@ -217,35 +248,51 @@
 
         <div class="welcome-corretor">
             <h1>Ola, {{ user.nome }}!</h1>
-            <p>Acompanhe seus contratos e comissões</p>
+            <p>Acompanhe suas comissoes: o que ja recebeu e o que falta para liberar</p>
         </div>
 
-        <!-- Estatisticas -->
+        <!-- Resumo -->
         <div class="stats-corretor">
-            <div class="stat-card">
-                <div class="stat-value" id="totalContratos">0</div>
-                <div class="stat-label">Total de Contratos</div>
+            <div class="stat-card recebido">
+                <div class="stat-value" id="totalRecebido">R$ 0,00</div>
+                <div class="stat-label">Ja recebido</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="totalComissoes">R$ 0,00</div>
-                <div class="stat-label">Total em Comissoes</div>
+            <div class="stat-card areceber">
+                <div class="stat-value" id="totalAReceber">R$ 0,00</div>
+                <div class="stat-label">A receber (aprovadas)</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="comissoesAprovadas">R$ 0,00</div>
-                <div class="stat-label">Comissões Aprovadas</div>
+            <div class="stat-card aguardando">
+                <div class="stat-value" id="totalAguardando">R$ 0,00</div>
+                <div class="stat-label">Aguardando gatilho</div>
             </div>
         </div>
 
         <!-- Lista de Contratos -->
         <div class="card">
             <h2 class="card-title">
-                <span>Meus Contratos</span>
+                <span>Minhas Comissoes</span>
             </h2>
+
+            <!-- Filtros -->
+            <div class="filtros-corretor">
+                <div class="situacao-tabs" id="situacaoTabs">
+                    <button class="situacao-tab ativo" data-situacao="todas">Todas</button>
+                    <button class="situacao-tab" data-situacao="aguardando_gatilho">Aguardando gatilho</button>
+                    <button class="situacao-tab" data-situacao="liberada">Liberada</button>
+                    <button class="situacao-tab" data-situacao="a_receber">A receber</button>
+                    <button class="situacao-tab" data-situacao="recebida">Recebida</button>
+                    <button class="situacao-tab" data-situacao="cancelada">Cancelada</button>
+                </div>
+                <select class="filtro-select" id="filtroEmpreendimento">
+                    <option value="">Todos os empreendimentos</option>
+                </select>
+                <input type="text" class="filtro-input" id="filtroBusca" placeholder="Buscar por contrato ou cliente...">
+            </div>
 
             <!-- Loading -->
             <div class="loading-corretor" id="loadingCorretor">
                 <div class="spinner"></div>
-                <p>Carregando seus contratos...</p>
+                <p>Carregando suas comissoes...</p>
             </div>
 
             <!-- Lista -->
@@ -255,8 +302,8 @@
             <!-- Estado vazio -->
             <div id="emptyStateCorretor" class="empty-state" style="display: none;">
                 <div class="empty-state-icon">-</div>
-                <h3>Nenhum contrato encontrado</h3>
-                <p>Voce ainda nao possui contratos registrados.</p>
+                <h3>Nenhuma comissao encontrada</h3>
+                <p>Nenhuma comissao para o filtro selecionado.</p>
             </div>
         </div>
     </div>
@@ -266,19 +313,22 @@
         const corretorSiengeId = {{ user.sienge_id or 'null' }};
         const corretorNome = "{{ user.nome }}";
 
+        let todasComissoes = [];
+        let filtroSituacao = 'todas';
+
+        // Mapa de situacoes (rotulo + classe de cor)
+        const SITUACOES = {
+            aguardando_gatilho: { label: 'Aguardando gatilho', cls: 'status-pendente' },
+            liberada:           { label: 'Liberada',           cls: 'status-liberada' },
+            a_receber:          { label: 'A receber',          cls: 'status-aprovada' },
+            recebida:           { label: 'Recebida',           cls: 'status-paga' },
+            cancelada:          { label: 'Cancelada',          cls: 'status-cancelada' },
+        };
+
         // Funcoes utilitarias
         function formatCurrency(value) {
             if (value === null || value === undefined || value === '') return 'R$ 0,00';
-            return new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL'
-            }).format(value);
-        }
-
-        function formatDate(dateStr) {
-            if (!dateStr) return '-';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('pt-BR');
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
         }
 
         function showAlert(message, type = 'info') {
@@ -290,43 +340,50 @@
             setTimeout(() => alert.remove(), 4000);
         }
 
-        function getStatusBadge(status, statusSienge) {
-            const statusLower = (status || '').toLowerCase();
-            const siengeLower = (statusSienge || '').toLowerCase();
-            // Parcela no Sienge primeiro (fonte do que está no ERP); evita "Cancelada" interna sobrepor Liberada sincronizada
-            if (siengeLower.includes('released') || siengeLower.includes('liberad')) {
-                return '<span class="status-badge status-liberada">Liberado</span>';
-            }
-            if (siengeLower.includes('paid') || siengeLower.includes('paidout') || siengeLower.includes('pago')) {
-                return '<span class="status-badge status-paga">Paga</span>';
-            }
-            if (siengeLower.includes('cancel')) {
-                return '<span class="status-badge status-cancelada">Cancelada</span>';
-            }
-            if (siengeLower.includes('overdue') || siengeLower.includes('vencid')) {
-                return '<span class="status-badge status-vencida">Vencida</span>';
-            }
-            if (siengeLower.includes('open') || siengeLower.includes('aberto')) {
-                return '<span class="status-badge status-aberta">Aberto</span>';
-            }
-            if (siengeLower.includes('awaiting') || siengeLower.includes('aguard')) {
-                return '<span class="status-badge status-pendente">Aguardando Autorização</span>';
-            }
-            if (statusLower.includes('aprovad')) return '<span class="status-badge status-aprovada">Aprovada</span>';
-            if (statusLower.includes('rejeitad')) return '<span class="status-badge status-cancelada">Rejeitada</span>';
-            if (statusLower.includes('pag')) return '<span class="status-badge status-paga">Paga</span>';
-            if (statusLower.includes('pendente de aprovação')) return '<span class="status-badge status-pendente">Em análise da direção</span>';
-            if (statusLower.includes('cancel')) {
-                return '<span class="status-badge status-cancelada">Cancelada</span>';
-            }
-            return '<span class="status-badge status-pendente">Aguardando liberação</span>';
+        // Define a situacao do corretor para uma comissao
+        function getSituacao(c) {
+            const status = (c.status_aprovacao || '').toLowerCase();
+            const sienge = (c.installment_status || '').toLowerCase();
+            if (sienge.includes('cancel') || status.includes('cancel') || status.includes('rejeit')) return 'cancelada';
+            if (sienge.includes('paid') || sienge.includes('pago') || status.includes('paga')) return 'recebida';
+            if (status.includes('aprovad')) return 'a_receber';
+            if (c.atingiu_gatilho) return 'liberada';
+            return 'aguardando_gatilho';
         }
 
-        // Carregar contratos do corretor
+        // Monta a faixa explicativa "quando vou receber"
+        function montarFaixaSituacao(c, situacao) {
+            const valorPago = parseFloat(c.valor_pago || 0);
+            const valorGatilho = parseFloat(c.valor_gatilho || 0);
+
+            if (situacao === 'aguardando_gatilho') {
+                const falta = Math.max(0, valorGatilho - valorPago);
+                const pct = valorGatilho > 0 ? Math.min(100, (valorPago / valorGatilho) * 100) : 0;
+                return `
+                    <div class="situacao-faixa aguardando">
+                        <strong>Falta o cliente pagar ${formatCurrency(falta)}</strong> para sua comissao liberar.
+                        <div class="progress-bar"><div class="progress-fill" style="width:${pct.toFixed(0)}%"></div></div>
+                        <div class="progress-legenda">Cliente ja pagou ${formatCurrency(valorPago)} de ${formatCurrency(valorGatilho)} necessarios (${pct.toFixed(0)}%)</div>
+                    </div>`;
+            }
+            if (situacao === 'liberada') {
+                return `<div class="situacao-faixa liberada"><strong>Gatilho atingido!</strong> Sua comissao esta liberada e seguindo para aprovacao.</div>`;
+            }
+            if (situacao === 'a_receber') {
+                return `<div class="situacao-faixa areceber"><strong>Comissao aprovada.</strong> Aguardando o pagamento pelo financeiro.</div>`;
+            }
+            if (situacao === 'recebida') {
+                return `<div class="situacao-faixa recebida"><strong>Comissao recebida.</strong> Pagamento concluido.</div>`;
+            }
+            if (situacao === 'cancelada') {
+                return `<div class="situacao-faixa cancelada">Contrato ou comissao cancelada.</div>`;
+            }
+            return '';
+        }
+
+        // Carregar comissoes do corretor
         async function carregarContratosCorretor() {
             const loading = document.getElementById('loadingCorretor');
-            const lista = document.getElementById('listaContratosCorretor');
-            const emptyState = document.getElementById('emptyStateCorretor');
 
             try {
                 const params = new URLSearchParams();
@@ -341,35 +398,75 @@
 
                 loading.style.display = 'none';
 
-                if (!contratos || contratos.length === 0) {
-                    emptyState.style.display = 'block';
-                    return;
+                todasComissoes = (contratos || []).map(c => ({ ...c, _situacao: getSituacao(c) }));
+
+                atualizarResumo();
+                preencherEmpreendimentos();
+                aplicarFiltros();
+
+            } catch (error) {
+                console.error('Erro ao carregar comissoes:', error);
+                loading.style.display = 'none';
+                showAlert('Erro ao carregar comissoes', 'error');
+            }
+        }
+
+        // Resumo (sempre sobre o total, nao muda com o filtro)
+        function atualizarResumo() {
+            let recebido = 0, aReceber = 0, aguardando = 0;
+            todasComissoes.forEach(c => {
+                const valor = parseFloat(c.commission_value || 0);
+                if (c._situacao === 'recebida') recebido += valor;
+                else if (c._situacao === 'a_receber') aReceber += valor;
+                else if (c._situacao === 'aguardando_gatilho') aguardando += valor;
+            });
+            document.getElementById('totalRecebido').textContent = formatCurrency(recebido);
+            document.getElementById('totalAReceber').textContent = formatCurrency(aReceber);
+            document.getElementById('totalAguardando').textContent = formatCurrency(aguardando);
+        }
+
+        function preencherEmpreendimentos() {
+            const select = document.getElementById('filtroEmpreendimento');
+            const nomes = [...new Set(todasComissoes.map(c => c.enterprise_name || c.empreendimento).filter(Boolean))].sort();
+            select.innerHTML = '<option value="">Todos os empreendimentos</option>' +
+                nomes.map(n => `<option value="${n}">${n}</option>`).join('');
+        }
+
+        // Aplica filtros e renderiza a lista
+        function aplicarFiltros() {
+            const lista = document.getElementById('listaContratosCorretor');
+            const emptyState = document.getElementById('emptyStateCorretor');
+            const empreend = document.getElementById('filtroEmpreendimento').value;
+            const busca = (document.getElementById('filtroBusca').value || '').toLowerCase().trim();
+
+            let filtradas = todasComissoes.filter(c => {
+                if (filtroSituacao !== 'todas' && c._situacao !== filtroSituacao) return false;
+                if (empreend && (c.enterprise_name || c.empreendimento) !== empreend) return false;
+                if (busca) {
+                    const alvo = `${c.numero_contrato || ''} ${c.customer_name || c.nome_cliente || ''}`.toLowerCase();
+                    if (!alvo.includes(busca)) return false;
                 }
+                return true;
+            });
 
-                lista.style.display = 'flex';
+            if (filtradas.length === 0) {
+                lista.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+            emptyState.style.display = 'none';
+            lista.style.display = 'flex';
 
-                // Calcular estatisticas
-                let totalComissoes = 0;
-                let comissoesAprovadas = 0;
-
-                contratos.forEach(c => {
-                    const valor = parseFloat(c.commission_value || 0);
-                    totalComissoes += valor;
-                    if ((c.status_aprovacao || '').toLowerCase().includes('aprovad')) {
-                        comissoesAprovadas += valor;
-                    }
-                });
-
-                document.getElementById('totalContratos').textContent = contratos.length;
-                document.getElementById('totalComissoes').textContent = formatCurrency(totalComissoes);
-                document.getElementById('comissoesAprovadas').textContent = formatCurrency(comissoesAprovadas);
-
-                // Renderizar contratos
-                lista.innerHTML = contratos.map(c => `
+            lista.innerHTML = filtradas.map(c => {
+                const sit = SITUACOES[c._situacao] || { label: '-', cls: 'gatilho-nao-info' };
+                return `
                     <div class="contrato-card">
                         <div class="contrato-header">
                             <div class="contrato-numero">Contrato ${c.numero_contrato || c.contract_number || '-'}</div>
-                            <div class="contrato-empreendimento">${c.enterprise_name || c.empreendimento || '-'}</div>
+                            <div style="display:flex; gap:0.5rem; align-items:center;">
+                                <span class="status-badge ${sit.cls}">${sit.label}</span>
+                                <span class="contrato-empreendimento">${c.enterprise_name || c.empreendimento || '-'}</span>
+                            </div>
                         </div>
                         <div class="contrato-info-grid">
                             <div class="contrato-info-item">
@@ -381,30 +478,31 @@
                                 <div class="contrato-info-value">${c.customer_name || c.nome_cliente || '-'}</div>
                             </div>
                             <div class="contrato-info-item">
-                                <div class="contrato-info-label">Comissão</div>
+                                <div class="contrato-info-label">Minha comissao</div>
                                 <div class="contrato-info-value valor">${formatCurrency(c.commission_value)}</div>
                             </div>
-                            <div class="contrato-info-item">
-                                <div class="contrato-info-label">Gatilho</div>
-                                <div class="contrato-info-value">${c.atingiu_gatilho ? '<span class="status-badge status-aprovada">Sim</span>' : '<span class="status-badge gatilho-nao-info">Não</span>'}</div>
-                            </div>
-                            <div class="contrato-info-item">
-                                <div class="contrato-info-label">Status</div>
-                                <div class="contrato-info-value">${getStatusBadge(c.status_aprovacao, c.installment_status)}</div>
-                            </div>
                         </div>
+                        ${montarFaixaSituacao(c, c._situacao)}
                     </div>
-                `).join('');
-
-            } catch (error) {
-                console.error('Erro ao carregar contratos:', error);
-                loading.style.display = 'none';
-                showAlert('Erro ao carregar contratos', 'error');
-            }
+                `;
+            }).join('');
         }
 
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', carregarContratosCorretor);
+        // Eventos dos filtros
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('situacaoTabs').addEventListener('click', (e) => {
+                const btn = e.target.closest('.situacao-tab');
+                if (!btn) return;
+                document.querySelectorAll('.situacao-tab').forEach(b => b.classList.remove('ativo'));
+                btn.classList.add('ativo');
+                filtroSituacao = btn.dataset.situacao;
+                aplicarFiltros();
+            });
+            document.getElementById('filtroEmpreendimento').addEventListener('change', aplicarFiltros);
+            document.getElementById('filtroBusca').addEventListener('input', aplicarFiltros);
+
+            carregarContratosCorretor();
+        });
     </script>
 </body>
 </html>
