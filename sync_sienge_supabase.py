@@ -310,22 +310,19 @@ class SiengeSupabaseSync:
         
         print("Sincronizando empreendimentos...")
         resultados['empreendimentos'] = self.sync_empreendimentos()
-        
-        print("Sincronizando contratos...")
-        resultados['contratos'] = self.sync_contratos(building_id)
-        
+
+        # NOTA: contratos, ITBI e valor pago agora são VIEWS no banco
+        # (comissoes_sienge_contratos / _itbi / _valor_pago), calculadas direto
+        # do Sienge. Não devem mais ser gravadas aqui — fazê-lo dá erro/redundância.
+        # Por isso sync_contratos / sync_itbi / sync_valores_pagos foram removidos
+        # deste fluxo. Os dados manuais ficam nas tabelas *_manual.
+
         print("Sincronizando corretores...")
         resultados['corretores'] = self.sync_corretores(building_id)
-        
+
         print("Sincronizando comissões...")
         resultados['comissoes'] = self.sync_comissoes(building_id)
-        
-        print("Sincronizando ITBI...")
-        resultados['itbi'] = self.sync_itbi(building_id)
-        
-        print("Sincronizando valores pagos...")
-        resultados['valores_pagos'] = self.sync_valores_pagos(building_id)
-        
+
         # Registrar última sincronização
         self.registrar_sincronizacao(resultados)
         

@@ -343,19 +343,16 @@ def executar_sincronizacao_completa():
     inicio = datetime.now()
     resultados = {}
     
-    # 1. Sincronizar contratos primeiro (base para os outros)
-    resultados['contratos'] = sincronizar_contratos()
-    
-    # 2. Sincronizar comissoes (incluindo canceladas)
+    # NOTA: contratos, ITBI e valor pago agora sao VIEWS no banco
+    # (comissoes_sienge_contratos / _itbi / _valor_pago), calculadas direto do
+    # Sienge. Nao devem mais ser gravadas aqui (daria erro/redundancia). Por isso
+    # sincronizar_contratos / sincronizar_itbis / sincronizar_valores_pagos foram
+    # removidos deste fluxo. Dados manuais ficam nas tabelas *_manual.
+
+    # Sincronizar comissoes (incluindo canceladas) - tabela real
     resultados['comissoes'] = sincronizar_comissoes()
-    
-    # 3. Sincronizar ITBIs
-    resultados['itbis'] = sincronizar_itbis()
-    
-    # 4. Sincronizar valores pagos
-    resultados['valores_pagos'] = sincronizar_valores_pagos()
-    
-    # 5. Sincronizar baseValue (valor a vista) das comissões
+
+    # Sincronizar baseValue (valor a vista) das comissoes - coluna real
     resultados['base_value'] = sincronizar_base_value()
     
     fim = datetime.now()
