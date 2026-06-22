@@ -318,13 +318,31 @@ class SiengeClient:
         return None
     
     def extract_valor_pago_from_contract(self, contract: Dict) -> float:
-        """Extrai valor total pago de todas as condições de pagamento"""
+        """Extrai valor total pago PELO CLIENTE somando todas as condições de pagamento,
+        EXCETO financiamento bancário (FN) — esse é dinheiro do banco, não do cliente.
+        
+        Tipos incluídos (dinheiro do cliente):
+        - AT  = Ato / Entrada
+        - PM  = Parcelas mensais
+        - BL  = Balões / Intermediárias
+        - IN  = Intermediárias
+        - DC  = ITBI / Despesas de Registro (o gatilho decide se usa ou não)
+        - outros tipos personalizados
+        
+        Tipo excluído:
+        - FN  = Financiamento bancário (não é pagamento do cliente)
+        """
         payment_conditions = contract.get('paymentConditions', [])
         if not payment_conditions:
             return 0
         
+        TIPOS_EXCLUIR = {'FN'}  # Financiamento bancário não conta como pago pelo cliente
+        
         total_pago = 0
         for pc in payment_conditions:
+            tipo = pc.get('conditionTypeId')
+            if tipo in TIPOS_EXCLUIR:
+                continue
             total_pago += float(pc.get('amountPaid', 0) or 0)
         
         return total_pago
