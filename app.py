@@ -786,8 +786,12 @@ def contratos_por_corretor():
                 if not c.get('unit_name') and contrato:
                     c['unit_name'] = contrato.get('unidade') or contrato.get('unit_name')
                 
-                # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
-                valor_a_vista = float(c.get('valor_comissao') or 0)
+                # Valor à vista = valor do contrato no Sienge (view comissoes_sienge_contratos),
+                # consistente com a função central obter_gatilho_contrato.
+                valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
+                if valor_a_vista == 0:
+                    # Fallback: baseValue guardado na comissão (quando não há contrato na view)
+                    valor_a_vista = float(c.get('valor_comissao') or 0)
                 
                 if valor_a_vista == 0:
                     # Fallback: calcular a partir do valor da comissão e percentual
@@ -1766,8 +1770,12 @@ def listar_todas_comissoes():
                 if not c.get('unit_name') and contrato:
                     c['unit_name'] = contrato.get('unidade') or contrato.get('unit_name')
                 
-                # valor_comissao agora armazena o baseValue (valor à vista) da API do Sienge
-                valor_a_vista = float(c.get('valor_comissao') or 0)
+                # Valor à vista = valor do contrato no Sienge (view comissoes_sienge_contratos),
+                # consistente com a função central obter_gatilho_contrato.
+                valor_a_vista = float((contrato.get('valor_a_vista') or contrato.get('valor_total') or 0)) if contrato else 0
+                if valor_a_vista == 0:
+                    # Fallback: baseValue guardado na comissão (quando não há contrato na view)
+                    valor_a_vista = float(c.get('valor_comissao') or 0)
                 
                 if valor_a_vista == 0:
                     # Fallback: calcular a partir do valor da comissão e percentual
