@@ -310,6 +310,7 @@ class SiengeSupabaseSync:
             result = self.supabase.table('comissoes_sienge_corretores')\
                 .select('*')\
                 .eq('ativo', True)\
+                .eq('origem', 'sienge')\
                 .order('nome')\
                 .execute()
             data = result.data if result.data else []
