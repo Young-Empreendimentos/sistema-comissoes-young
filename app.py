@@ -73,6 +73,14 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 # Inicializar AuthManager
 auth_manager = AuthManager()
 
+# ==================== CONFIG LOGIN GOOGLE (Supabase Auth) ====================
+# Login dos GESTORES é feito via Google, usando o mesmo Supabase Auth dos demais
+# sistemas. A chave abaixo é a PUBLICÁVEL (anon) — pode ir pro navegador.
+# (NÃO usar a SUPABASE_KEY de serviço no front!)
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', 'sb_publishable_VRzI66cuw15hnqnoPKe27A_UmUbuhPC')
+DOMINIO_GOOGLE = '@youngempreendimentos.com.br'
+
 
 def fetch_all_paginated(supabase_client, table_name: str, columns: str = '*', batch_size: int = 1000) -> list:
     """Busca todos os registros de uma tabela com paginação automática.
@@ -331,8 +339,10 @@ def login():
                 return redirect(url_for('dashboard'))
         
         flash('Credenciais inválidas', 'error')
-    
-    return render_template('login_unificado.html')
+
+    return render_template('login_unificado.html',
+                           supabase_url=SUPABASE_URL,
+                           supabase_anon_key=SUPABASE_ANON_KEY)
 
 
 @app.route('/logout')
@@ -340,6 +350,69 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+
+# ==================== LOGIN GESTOR VIA GOOGLE ====================
+
+@app.route('/auth/google')
+def auth_google():
+    """Página de retorno do Google: captura a sessão do Supabase no navegador
+    e envia o token para o backend validar."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template('auth_google.html',
+                           supabase_url=SUPABASE_URL,
+                           supabase_anon_key=SUPABASE_ANON_KEY)
+
+
+@app.route('/auth/google/verify', methods=['POST'])
+def auth_google_verify():
+    """Valida o token do Supabase, confere domínio @young, acha o gestor por
+    e-mail e faz login. E-mail novo @young vira cadastro pendente."""
+    data = request.get_json(silent=True) or {}
+    token = (data.get('access_token') or '').strip()
+    if not token:
+        return jsonify({'ok': False, 'erro': 'Token ausente'}), 400
+
+    email = auth_manager.validar_token_supabase(token)
+    if not email:
+        return jsonify({'ok': False, 'erro': 'Sessão inválida'}), 401
+
+    if not email.endswith(DOMINIO_GOOGLE):
+        return jsonify({'ok': False,
+                        'erro': f'Login permitido apenas para e-mails {DOMINIO_GOOGLE}.'}), 403
+
+    usuario = auth_manager.autenticar_gestor_por_email(email)
+    if usuario:
+        login_user(usuario)
+        destino = url_for('dashboard_direcao') if usuario.perfil == 'Direção' else url_for('dashboard')
+        return jsonify({'ok': True, 'redirect': destino})
+
+    # E-mail @young válido, mas não é gestor aprovado -> cria pendente p/ aprovação
+    auth_manager.registrar_pendente(email)
+    return jsonify({'ok': False, 'pendente': True,
+                    'erro': 'Seu acesso está aguardando autorização de um administrador.'}), 403
+
+
+@app.route('/admin/pendentes')
+@login_required
+def admin_pendentes():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    return render_template('admin_pendentes.html',
+                           pendentes=auth_manager.listar_pendentes(),
+                           user=current_user)
+
+
+@app.route('/api/usuarios/<int:user_id>/aprovar', methods=['POST'])
+@login_required
+def aprovar_usuario(user_id):
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Acesso negado'}), 403
+    data = request.get_json(silent=True) or {}
+    perfil = data.get('perfil', 'Gestor')
+    is_admin = bool(data.get('is_admin', False))
+    return jsonify(auth_manager.aprovar_gestor(user_id, perfil, is_admin))
 
 
 # ==================== ROTAS DE SAÚDE E MONITORAMENTO ====================

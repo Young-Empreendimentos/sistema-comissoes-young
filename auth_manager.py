@@ -437,7 +437,110 @@ class AuthManager:
                     .update({'ativo': False})\
                     .eq('id', user_id)\
                     .execute()
-            
+
+            return {'sucesso': True}
+        except Exception as e:
+            return {'sucesso': False, 'erro': str(e)}
+
+    # ==================== LOGIN VIA GOOGLE (Supabase Auth) ====================
+
+    def validar_token_supabase(self, access_token: str) -> Optional[str]:
+        """Valida um access_token do Supabase e retorna o e-mail (minúsculo) ou None."""
+        try:
+            resp = self.supabase.auth.get_user(access_token)
+            user = getattr(resp, 'user', None)
+            email = getattr(user, 'email', None) if user else None
+            return email.strip().lower() if email else None
+        except Exception as e:
+            print(f"[GOOGLE] Token inválido: {e}")
+            return None
+
+    def autenticar_gestor_por_email(self, email: str) -> Optional[Usuario]:
+        """Acha um gestor APROVADO e ATIVO pelo e-mail. Retorna Usuario ou None."""
+        try:
+            email = (email or '').strip().lower()
+            resultado = self.supabase.table('comissoes_usuarios').select('*').execute()
+            alvo = None
+            for u in (resultado.data or []):
+                if (u.get('email') or '').strip().lower() == email and email:
+                    alvo = u
+                    break
+            if not alvo:
+                return None
+            if alvo.get('ativo') is False or alvo.get('aprovado') is not True:
+                return None
+            try:
+                self.supabase.table('comissoes_usuarios')\
+                    .update({'ultimo_login': datetime.now().isoformat()})\
+                    .eq('id', alvo['id']).execute()
+            except Exception:
+                pass
+            return Usuario(
+                id=alvo['id'],
+                username=alvo.get('username', ''),
+                nome_completo=alvo.get('nome_completo') or alvo.get('username', ''),
+                is_admin=alvo.get('is_admin', False),
+                perfil=alvo.get('perfil', 'Gestor'),
+            )
+        except Exception as e:
+            print(f"[GOOGLE] Erro ao autenticar gestor: {e}")
+            return None
+
+    def registrar_pendente(self, email: str, nome: str = None) -> dict:
+        """Cria um gestor PENDENTE (aprovado=False) para um e-mail @young novo."""
+        try:
+            email = (email or '').strip().lower()
+            # Já existe? (aprovado ou pendente) -> não duplica
+            existentes = self.supabase.table('comissoes_usuarios').select('id, email').execute()
+            for u in (existentes.data or []):
+                if (u.get('email') or '').strip().lower() == email:
+                    return {'sucesso': True, 'ja_existe': True}
+            # username único derivado do e-mail
+            base = email.split('@')[0] or 'usuario'
+            username = base
+            i = 1
+            while self.supabase.table('comissoes_usuarios').select('id').eq('username', username).execute().data:
+                i += 1
+                username = f"{base}{i}"
+            self.supabase.table('comissoes_usuarios').insert({
+                'username': username,
+                'email': email,
+                'nome_completo': nome or email,
+                'perfil': 'Gestor',
+                'is_admin': False,
+                'aprovado': False,
+                'ativo': True,
+                'criado_em': datetime.now().isoformat(),
+                'criado_por': 'auto (Google)',
+            }).execute()
+            return {'sucesso': True, 'ja_existe': False}
+        except Exception as e:
+            print(f"[GOOGLE] Erro ao registrar pendente: {e}")
+            return {'sucesso': False, 'erro': str(e)}
+
+    def listar_pendentes(self) -> list:
+        """Lista cadastros aguardando autorização (aprovado=False e com e-mail)."""
+        try:
+            resultado = self.supabase.table('comissoes_usuarios')\
+                .select('id, username, email, nome_completo, criado_em')\
+                .eq('aprovado', False)\
+                .not_.is_('email', 'null')\
+                .order('criado_em')\
+                .execute()
+            return resultado.data or []
+        except Exception as e:
+            print(f"Erro ao listar pendentes: {e}")
+            return []
+
+    def aprovar_gestor(self, user_id: int, perfil: str = 'Gestor', is_admin: bool = False) -> dict:
+        """Aprova um gestor pendente, definindo perfil e admin."""
+        try:
+            self.supabase.table('comissoes_usuarios').update({
+                'aprovado': True,
+                'ativo': True,
+                'perfil': perfil,
+                'is_admin': bool(is_admin),
+            }).eq('id', user_id).execute()
             return {'sucesso': True}
         except Exception as e:
             return {'sucesso': False, 'erro': str(e)}

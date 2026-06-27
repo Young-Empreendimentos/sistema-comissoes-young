@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrando… - Comissões Young</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background:#0D0D0D; color:#fff; min-height:100vh; margin:0;
+               display:flex; align-items:center; justify-content:center; text-align:center; }
+        .box { max-width: 360px; padding: 2rem; }
+        .spin { width:38px; height:38px; border:3px solid rgba(254,80,9,.25);
+                border-top-color:#FE5009; border-radius:50%; margin:0 auto 1.25rem;
+                animation: r 0.9s linear infinite; }
+        @keyframes r { to { transform: rotate(360deg); } }
+        #msg { color:#D7D7D9; font-size:.95rem; line-height:1.5; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="spin" id="spin"></div>
+        <div id="msg">Entrando…</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (async function () {
+            var msg = document.getElementById('msg');
+            var spin = document.getElementById('spin');
+            function falha(texto) {
+                spin.style.display = 'none';
+                msg.textContent = texto || 'Não foi possível entrar.';
+                setTimeout(function () { window.location = '/login'; }, 4500);
+            }
+            try {
+                var sb = window.supabase.createClient("{{ supabase_url }}", "{{ supabase_anon_key }}");
+                // dá tempo do supabase-js processar o token que veio na URL
+                var res = await sb.auth.getSession();
+                var session = res.data.session;
+                if (!session) {
+                    await new Promise(function (r) { setTimeout(r, 500); });
+                    res = await sb.auth.getSession();
+                    session = res.data.session;
+                }
+                if (!session) { return falha('Sessão não encontrada. Tente novamente.'); }
+
+                var resp = await fetch('/auth/google/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ access_token: session.access_token })
+                });
+                var out = await resp.json();
+
+                // já temos a sessão no servidor (Flask-Login); encerra a do supabase no navegador
+                try { await sb.auth.signOut(); } catch (e) {}
+
+                if (out.ok) { window.location = out.redirect || '/'; }
+                else { falha(out.erro); }
+            } catch (e) {
+                falha('Erro ao entrar. Tente novamente.');
+            }
+        })();
+    </script>
+</body>
+</html>

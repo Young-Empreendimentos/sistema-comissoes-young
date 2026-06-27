@@ -256,22 +256,13 @@
                 <button class="login-tab" onclick="showForm('corretor')">Corretor</button>
             </div>
 
-            <!-- Formulário Gestor -->
-            <form id="gestorForm" class="active" method="POST" action="{{ url_for('login') }}">
-                <input type="hidden" name="tipo_login" value="gestor">
-                
-                <div class="form-group">
-                    <label class="form-label" for="username">Usuário</label>
-                    <input type="text" id="username" name="username" class="form-input" placeholder="Digite seu usuário" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="senha">Senha</label>
-                    <input type="password" id="senha" name="senha" class="form-input" placeholder="Digite sua senha" required>
-                </div>
-
-                <button type="submit" class="btn-login">Entrar</button>
-            </form>
+            <!-- Gestor: login via Google -->
+            <div id="gestorForm" class="active">
+                <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:1.25rem;text-align:center;line-height:1.5">
+                    Gestores e direção entram com a conta Google da Young.
+                </p>
+                <button type="button" class="btn-login" id="btnGoogle">Entrar com Google</button>
+            </div>
 
             <!-- Formulário Corretor -->
             <form id="corretorForm" method="POST" action="{{ url_for('login') }}">
@@ -323,6 +314,24 @@
             
             e.target.value = value;
         });
+    </script>
+
+    <!-- Login Google (gestores) via Supabase Auth -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (function () {
+            var btn = document.getElementById('btnGoogle');
+            if (!btn || !window.supabase) return;
+            var sb = window.supabase.createClient("{{ supabase_url }}", "{{ supabase_anon_key }}");
+            btn.addEventListener('click', async function () {
+                btn.disabled = true;
+                btn.textContent = 'Redirecionando…';
+                await sb.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { redirectTo: window.location.origin + '/auth/google' }
+                });
+            });
+        })();
     </script>
 </body>
 </html>

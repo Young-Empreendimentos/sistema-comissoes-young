@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aprovar acessos - Comissões Young</title>
+    <style>
+        :root { --orange:#FE5009; --bg:#0D0D0D; --card:#1c1c1c; --line:rgba(254,80,9,.2); --muted:#9E9E9E; }
+        * { box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg);
+               color:#fff; margin:0; padding:2rem 1rem; }
+        .wrap { max-width:860px; margin:0 auto; }
+        h1 { font-size:1.4rem; margin:0 0 .25rem; }
+        .sub { color:var(--muted); font-size:.9rem; margin-bottom:1.5rem; }
+        a.voltar { color:var(--orange); text-decoration:none; font-size:.9rem; }
+        .item { background:var(--card); border:1px solid var(--line); border-radius:12px;
+                padding:1rem 1.25rem; margin-bottom:.75rem; display:flex; gap:1rem; align-items:center;
+                flex-wrap:wrap; justify-content:space-between; }
+        .who { min-width:200px; }
+        .who .nome { font-weight:600; }
+        .who .email { color:var(--muted); font-size:.85rem; }
+        .controls { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; }
+        select { background:#000; color:#fff; border:1px solid var(--line); border-radius:8px; padding:.5rem; }
+        label.chk { font-size:.85rem; color:#D7D7D9; display:flex; gap:.35rem; align-items:center; }
+        button { background:var(--orange); color:#fff; border:none; border-radius:8px; padding:.55rem 1rem;
+                 font-weight:600; cursor:pointer; }
+        button:disabled { opacity:.5; cursor:default; }
+        .vazio { color:var(--muted); background:var(--card); border:1px solid var(--line);
+                 border-radius:12px; padding:2rem; text-align:center; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <a class="voltar" href="/dashboard">← Voltar</a>
+        <h1>Acessos aguardando autorização</h1>
+        <div class="sub">Pessoas @young que entraram pelo Google mas ainda não têm acesso liberado.</div>
+
+        {% if pendentes and pendentes|length > 0 %}
+            {% for p in pendentes %}
+            <div class="item" data-id="{{ p.id }}">
+                <div class="who">
+                    <div class="nome">{{ p.nome_completo or p.username }}</div>
+                    <div class="email">{{ p.email }}</div>
+                </div>
+                <div class="controls">
+                    <select class="perfil">
+                        <option value="Gestor">Gestor</option>
+                        <option value="Direção">Direção</option>
+                    </select>
+                    <label class="chk"><input type="checkbox" class="admin"> Admin</label>
+                    <button onclick="aprovar(this, {{ p.id }})">Aprovar</button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="vazio">Nenhum acesso pendente. 🎉</div>
+        {% endif %}
+    </div>
+
+    <script>
+        async function aprovar(btn, id) {
+            var item = btn.closest('.item');
+            var perfil = item.querySelector('.perfil').value;
+            var isAdmin = item.querySelector('.admin').checked;
+            btn.disabled = true; btn.textContent = 'Aprovando…';
+            try {
+                var resp = await fetch('/api/usuarios/' + id + '/aprovar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ perfil: perfil, is_admin: isAdmin })
+                });
+                var out = await resp.json();
+                if (out.sucesso) { item.remove(); }
+                else { btn.disabled = false; btn.textContent = 'Aprovar'; alert(out.erro || 'Erro ao aprovar.'); }
+            } catch (e) {
+                btn.disabled = false; btn.textContent = 'Aprovar'; alert('Erro ao aprovar.');
+            }
+        }
+    </script>
+</body>
+</html>
