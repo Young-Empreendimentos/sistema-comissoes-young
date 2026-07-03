@@ -78,6 +78,16 @@ def pode_aprovar(user) -> bool:
     """Quem pode liberar/aprovar acessos: Direção ou Admin."""
     return bool(getattr(user, 'is_admin', False) or getattr(user, 'perfil', None) == 'Direção')
 
+
+def contar_pendentes(user) -> int:
+    """Total de acessos aguardando autorização (gestores + corretores). 0 se não pode aprovar."""
+    if not pode_aprovar(user):
+        return 0
+    try:
+        return len(auth_manager.listar_pendentes()) + len(auth_manager.listar_corretores_pendentes())
+    except Exception:
+        return 0
+
 # ==================== CONFIG LOGIN GOOGLE (Supabase Auth) ====================
 # Login dos GESTORES é feito via Google, usando o mesmo Supabase Auth dos demais
 # sistemas. A chave abaixo é a PUBLICÁVEL (anon) — pode ir pro navegador.
@@ -450,7 +460,9 @@ def health_check():
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
             'service': 'Sistema de Comissões Young',
-            'database': 'connected'
+            'database': 'connected',
+            # Commit em produção (Railway injeta RAILWAY_GIT_COMMIT_SHA no deploy)
+            'build': (os.getenv('RAILWAY_GIT_COMMIT_SHA') or 'desconhecido')[:12]
         }), 200
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
@@ -486,7 +498,9 @@ def dashboard():
         return redirect(url_for('dashboard_corretor'))
     if hasattr(current_user, 'perfil') and current_user.perfil == 'Direção':
         return redirect(url_for('dashboard_direcao'))
-    return render_template('dashboard.html', user=current_user)
+    return render_template('dashboard.html', user=current_user,
+                           pode_aprovar=pode_aprovar(current_user),
+                           pendentes_count=contar_pendentes(current_user))
 
 
 @app.route('/dashboard/corretor')
@@ -502,7 +516,9 @@ def dashboard_corretor():
 def dashboard_direcao():
     if not hasattr(current_user, 'perfil') or current_user.perfil != 'Direção':
         return redirect(url_for('dashboard'))
-    return render_template('dashboard_direcao.html', user=current_user)
+    return render_template('dashboard_direcao.html', user=current_user,
+                           pode_aprovar=pode_aprovar(current_user),
+                           pendentes_count=contar_pendentes(current_user))
 
 
 # ==================== API - EMPREENDIMENTOS ====================

@@ -1002,6 +1002,16 @@
         <!-- Alerts -->
         <div id="alerts"></div>
 
+        {% if pode_aprovar and pendentes_count and pendentes_count > 0 %}
+        <a href="{{ url_for('admin_pendentes') }}" style="display:flex;align-items:center;gap:.75rem;justify-content:space-between;flex-wrap:wrap;background:rgba(254,80,9,.12);border:1px solid rgba(254,80,9,.5);border-radius:12px;padding:1rem 1.25rem;margin:1rem 0;text-decoration:none;color:#fff;">
+            <span style="display:flex;align-items:center;gap:.6rem;">
+                <span style="font-size:1.3rem;">🔔</span>
+                <span><strong>{{ pendentes_count }}</strong> acesso(s) aguardando sua autorização</span>
+            </span>
+            <span style="background:#FE5009;color:#fff;border-radius:8px;padding:.5rem .9rem;font-weight:600;">Revisar solicitações</span>
+        </a>
+        {% endif %}
+
         <!-- Página: Comissões Pendentes -->
         <div id="page-pendentes" class="page-direcao active">
             <!-- Header da página -->
