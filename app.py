@@ -73,6 +73,11 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 # Inicializar AuthManager
 auth_manager = AuthManager()
 
+
+def pode_aprovar(user) -> bool:
+    """Quem pode liberar/aprovar acessos: Direção ou Admin."""
+    return bool(getattr(user, 'is_admin', False) or getattr(user, 'perfil', None) == 'Direção')
+
 # ==================== CONFIG LOGIN GOOGLE (Supabase Auth) ====================
 # Login dos GESTORES é feito via Google, usando o mesmo Supabase Auth dos demais
 # sistemas. A chave abaixo é a PUBLICÁVEL (anon) — pode ir pro navegador.
@@ -325,20 +330,26 @@ def login():
         if tipo_login == 'corretor':
             # Login de corretor (CPF)
             usuario = auth_manager.autenticar_corretor(username, senha)
-            if usuario:
+            if usuario == 'pendente':
+                flash('Seu cadastro está aguardando liberação da diretoria.', 'error')
+            elif usuario:
                 login_user(usuario)
                 return redirect(url_for('dashboard_corretor'))
+            else:
+                flash('Credenciais inválidas', 'error')
         else:
             # Login de gestor
             usuario = auth_manager.autenticar(username, senha)
-            if usuario:
+            if usuario == 'pendente':
+                flash('Seu acesso está aguardando liberação da diretoria.', 'error')
+            elif usuario:
                 login_user(usuario)
                 # Redirecionar direção para página específica
                 if usuario.perfil == 'Direção':
                     return redirect(url_for('dashboard_direcao'))
                 return redirect(url_for('dashboard'))
-        
-        flash('Credenciais inválidas', 'error')
+            else:
+                flash('Credenciais inválidas', 'error')
 
     return render_template('login_unificado.html',
                            supabase_url=SUPABASE_URL,
@@ -397,22 +408,32 @@ def auth_google_verify():
 @app.route('/admin/pendentes')
 @login_required
 def admin_pendentes():
-    if not current_user.is_admin:
+    if not pode_aprovar(current_user):
         return redirect(url_for('dashboard'))
     return render_template('admin_pendentes.html',
                            pendentes=auth_manager.listar_pendentes(),
+                           corretores_pendentes=auth_manager.listar_corretores_pendentes(),
                            user=current_user)
 
 
 @app.route('/api/usuarios/<int:user_id>/aprovar', methods=['POST'])
 @login_required
 def aprovar_usuario(user_id):
-    if not current_user.is_admin:
+    if not pode_aprovar(current_user):
         return jsonify({'erro': 'Acesso negado'}), 403
     data = request.get_json(silent=True) or {}
     perfil = data.get('perfil', 'Gestor')
     is_admin = bool(data.get('is_admin', False))
     return jsonify(auth_manager.aprovar_gestor(user_id, perfil, is_admin))
+
+
+@app.route('/api/corretores/<int:sienge_id>/aprovar', methods=['POST'])
+@login_required
+def aprovar_corretor_route(sienge_id):
+    if not pode_aprovar(current_user):
+        return jsonify({'erro': 'Acesso negado'}), 403
+    aprovador = getattr(current_user, 'nome_completo', None) or getattr(current_user, 'username', 'admin')
+    return jsonify(auth_manager.aprovar_corretor(sienge_id, aprovador))
 
 
 # ==================== ROTAS DE SAÚDE E MONITORAMENTO ====================
@@ -2328,7 +2349,8 @@ def cadastro_corretor():
         )
         
         if resultado['sucesso']:
-            flash('Cadastro realizado com sucesso! Faça login.', 'success')
+            flash('Cadastro enviado! Seu acesso está aguardando liberação da diretoria. '
+                  'Você poderá entrar assim que for aprovado.', 'success')
             return redirect(url_for('login'))
         else:
             flash(resultado.get('erro', 'Erro no cadastro'), 'error')

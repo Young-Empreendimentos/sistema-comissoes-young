@@ -134,7 +134,12 @@ class AuthManager:
             
             if not senha_correta:
                 return None
-            
+
+            # Exige liberação da diretoria/admin (mesmo com senha correta)
+            if usuario_data.get('aprovado') is not True:
+                print("[DEBUG] Usuario com senha correta, mas nao aprovado (pendente)")
+                return 'pendente'
+
             # Atualizar último login (opcional)
             try:
                 self.supabase.table('comissoes_usuarios')\
@@ -202,7 +207,12 @@ class AuthManager:
             if not self._verificar_senha(senha, hash_armazenado):
                 print(f"[AUTH] Senha incorreta")
                 return None
-            
+
+            # Exige liberação da diretoria/admin (mesmo com senha correta)
+            if corretor_data.get('aprovado') is not True:
+                print(f"[AUTH] Corretor com senha correta, mas pendente de aprovacao")
+                return 'pendente'
+
             # Atualizar último login
             try:
                 self.supabase.table('comissoes_sienge_corretores')\
@@ -240,6 +250,9 @@ class AuthManager:
                     corretor_data = resultado.data[0]
                     # Verificar se está ativo (pode não ter o campo, então default True)
                     if corretor_data.get('ativo') is False:
+                        return None
+                    # Sessão só vale para corretor liberado
+                    if corretor_data.get('aprovado') is not True:
                         return None
                     return CorretorUser(
                         id=corretor_data['sienge_id'],
@@ -340,9 +353,11 @@ class AuthManager:
             if corretor.get('senha_hash') or corretor.get('password_hash'):
                 return {'sucesso': False, 'erro': 'Este corretor já possui cadastro. Use a opção de login.'}
             
-            # Atualizar o registro com a senha e email
+            # Atualizar o registro com a senha e email.
+            # aprovado=False: fica aguardando liberação da diretoria/admin antes de acessar.
             atualizacao = {
                 'senha_hash': self._hash_senha(senha),
+                'aprovado': False,
                 'cadastro_login_em': datetime.now().isoformat()
             }
             
@@ -541,6 +556,39 @@ class AuthManager:
                 'perfil': perfil,
                 'is_admin': bool(is_admin),
             }).eq('id', user_id).execute()
+            return {'sucesso': True}
+        except Exception as e:
+            return {'sucesso': False, 'erro': str(e)}
+
+    def listar_corretores_pendentes(self) -> list:
+        """Lista corretores que se cadastraram (têm senha) mas ainda não foram liberados."""
+        try:
+            resultado = self.supabase.table('comissoes_sienge_corretores')\
+                .select('sienge_id, nome, cpf, cnpj, email, cadastro_login_em')\
+                .not_.is_('senha_hash', 'null')\
+                .eq('aprovado', False)\
+                .order('cadastro_login_em')\
+                .execute()
+            corretores = resultado.data or []
+            return [{
+                'sienge_id': c.get('sienge_id'),
+                'nome': c.get('nome'),
+                'documento': c.get('cpf') or c.get('cnpj') or '-',
+                'email': c.get('email'),
+                'cadastro_em': c.get('cadastro_login_em'),
+            } for c in corretores]
+        except Exception as e:
+            print(f"Erro ao listar corretores pendentes: {e}")
+            return []
+
+    def aprovar_corretor(self, sienge_id, aprovado_por: str = None) -> dict:
+        """Libera o acesso de um corretor pendente."""
+        try:
+            self.supabase.table('comissoes_sienge_corretores').update({
+                'aprovado': True,
+                'aprovado_por': aprovado_por or 'sistema',
+                'aprovado_em': datetime.now().isoformat(),
+            }).eq('sienge_id', sienge_id).execute()
             return {'sucesso': True}
         except Exception as e:
             return {'sucesso': False, 'erro': str(e)}

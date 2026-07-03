@@ -33,8 +33,9 @@
     <div class="wrap">
         <a class="voltar" href="/dashboard">← Voltar</a>
         <h1>Acessos aguardando autorização</h1>
-        <div class="sub">Pessoas @young que entraram pelo Google mas ainda não têm acesso liberado.</div>
+        <div class="sub">Libere abaixo quem pediu acesso. Só Direção e Admin podem aprovar.</div>
 
+        <h2 style="font-size:1.05rem;margin:1.5rem 0 .6rem;">Gestores (login @young / usuário)</h2>
         {% if pendentes and pendentes|length > 0 %}
             {% for p in pendentes %}
             <div class="item" data-id="{{ p.id }}">
@@ -53,7 +54,24 @@
             </div>
             {% endfor %}
         {% else %}
-            <div class="vazio">Nenhum acesso pendente. 🎉</div>
+            <div class="vazio">Nenhum gestor pendente. 🎉</div>
+        {% endif %}
+
+        <h2 style="font-size:1.05rem;margin:2rem 0 .6rem;">Corretores (login por CPF)</h2>
+        {% if corretores_pendentes and corretores_pendentes|length > 0 %}
+            {% for c in corretores_pendentes %}
+            <div class="item" data-corretor="{{ c.sienge_id }}">
+                <div class="who">
+                    <div class="nome">{{ c.nome }}</div>
+                    <div class="email">{{ c.documento }}{% if c.email %} · {{ c.email }}{% endif %}</div>
+                </div>
+                <div class="controls">
+                    <button onclick="aprovarCorretor(this, {{ c.sienge_id }})">Liberar acesso</button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="vazio">Nenhum corretor pendente. 🎉</div>
         {% endif %}
     </div>
 
@@ -74,6 +92,22 @@
                 else { btn.disabled = false; btn.textContent = 'Aprovar'; alert(out.erro || 'Erro ao aprovar.'); }
             } catch (e) {
                 btn.disabled = false; btn.textContent = 'Aprovar'; alert('Erro ao aprovar.');
+            }
+        }
+
+        async function aprovarCorretor(btn, siengeId) {
+            var item = btn.closest('.item');
+            btn.disabled = true; btn.textContent = 'Liberando…';
+            try {
+                var resp = await fetch('/api/corretores/' + siengeId + '/aprovar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                var out = await resp.json();
+                if (out.sucesso) { item.remove(); }
+                else { btn.disabled = false; btn.textContent = 'Liberar acesso'; alert(out.erro || 'Erro ao liberar.'); }
+            } catch (e) {
+                btn.disabled = false; btn.textContent = 'Liberar acesso'; alert('Erro ao liberar.');
             }
         }
     </script>
