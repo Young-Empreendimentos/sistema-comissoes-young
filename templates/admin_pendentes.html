@@ -25,6 +25,8 @@
         button { background:var(--orange); color:#fff; border:none; border-radius:8px; padding:.55rem 1rem;
                  font-weight:600; cursor:pointer; }
         button:disabled { opacity:.5; cursor:default; }
+        button.btn-recusar { background:transparent; border:1px solid rgba(255,255,255,.3); color:#D7D7D9; }
+        button.btn-recusar:hover { border-color:#fca5a5; color:#fca5a5; }
         .vazio { color:var(--muted); background:var(--card); border:1px solid var(--line);
                  border-radius:12px; padding:2rem; text-align:center; }
     </style>
@@ -50,6 +52,7 @@
                     </select>
                     <label class="chk"><input type="checkbox" class="admin"> Admin</label>
                     <button onclick="aprovar(this, {{ p.id }})">Aprovar</button>
+                    <button class="btn-recusar" onclick="rejeitar(this, {{ p.id }})">Recusar</button>
                 </div>
             </div>
             {% endfor %}
@@ -67,6 +70,7 @@
                 </div>
                 <div class="controls">
                     <button onclick="aprovarCorretor(this, {{ c.sienge_id }})">Liberar acesso</button>
+                    <button class="btn-recusar" onclick="rejeitarCorretor(this, {{ c.sienge_id }})">Recusar</button>
                 </div>
             </div>
             {% endfor %}
@@ -108,6 +112,38 @@
                 else { btn.disabled = false; btn.textContent = 'Liberar acesso'; alert(out.erro || 'Erro ao liberar.'); }
             } catch (e) {
                 btn.disabled = false; btn.textContent = 'Liberar acesso'; alert('Erro ao liberar.');
+            }
+        }
+
+        async function rejeitar(btn, id) {
+            if (!confirm('Recusar este pedido de acesso? A solicitação será removida.')) return;
+            var item = btn.closest('.item');
+            btn.disabled = true; btn.textContent = 'Recusando…';
+            try {
+                var resp = await fetch('/api/usuarios/' + id + '/rejeitar', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }
+                });
+                var out = await resp.json();
+                if (out.sucesso) { item.remove(); }
+                else { btn.disabled = false; btn.textContent = 'Recusar'; alert(out.erro || 'Erro ao recusar.'); }
+            } catch (e) {
+                btn.disabled = false; btn.textContent = 'Recusar'; alert('Erro ao recusar.');
+            }
+        }
+
+        async function rejeitarCorretor(btn, siengeId) {
+            if (!confirm('Recusar o acesso deste corretor? O cadastro de senha será removido (ele poderá se cadastrar de novo).')) return;
+            var item = btn.closest('.item');
+            btn.disabled = true; btn.textContent = 'Recusando…';
+            try {
+                var resp = await fetch('/api/corretores/' + siengeId + '/rejeitar', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }
+                });
+                var out = await resp.json();
+                if (out.sucesso) { item.remove(); }
+                else { btn.disabled = false; btn.textContent = 'Recusar'; alert(out.erro || 'Erro ao recusar.'); }
+            } catch (e) {
+                btn.disabled = false; btn.textContent = 'Recusar'; alert('Erro ao recusar.');
             }
         }
     </script>

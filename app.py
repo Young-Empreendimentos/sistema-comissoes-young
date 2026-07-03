@@ -446,6 +446,22 @@ def aprovar_corretor_route(sienge_id):
     return jsonify(auth_manager.aprovar_corretor(sienge_id, aprovador))
 
 
+@app.route('/api/usuarios/<int:user_id>/rejeitar', methods=['POST'])
+@login_required
+def rejeitar_usuario(user_id):
+    if not pode_aprovar(current_user):
+        return jsonify({'erro': 'Acesso negado'}), 403
+    return jsonify(auth_manager.rejeitar_gestor(user_id))
+
+
+@app.route('/api/corretores/<int:sienge_id>/rejeitar', methods=['POST'])
+@login_required
+def rejeitar_corretor_route(sienge_id):
+    if not pode_aprovar(current_user):
+        return jsonify({'erro': 'Acesso negado'}), 403
+    return jsonify(auth_manager.rejeitar_corretor(sienge_id))
+
+
 # ==================== ROTAS DE SAÚDE E MONITORAMENTO ====================
 
 @app.route('/health')

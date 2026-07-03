@@ -593,6 +593,33 @@ class AuthManager:
         except Exception as e:
             return {'sucesso': False, 'erro': str(e)}
 
+    def rejeitar_gestor(self, user_id: int) -> dict:
+        """Recusa (remove) um pedido de acesso de gestor pendente."""
+        try:
+            # Segurança: não apagar quem já foi aprovado (use desativar para isso)
+            reg = self.supabase.table('comissoes_usuarios')\
+                .select('aprovado').eq('id', user_id).execute()
+            if reg.data and reg.data[0].get('aprovado') is True:
+                return {'sucesso': False, 'erro': 'Usuário já aprovado; use desativar, não recusar.'}
+            self.supabase.table('comissoes_usuarios').delete().eq('id', user_id).execute()
+            return {'sucesso': True}
+        except Exception as e:
+            return {'sucesso': False, 'erro': str(e)}
+
+    def rejeitar_corretor(self, sienge_id) -> dict:
+        """Recusa o acesso de um corretor pendente: remove a senha e mantém não aprovado.
+        Não apaga o corretor (o registro vem do Sienge); ele pode se cadastrar de novo."""
+        try:
+            self.supabase.table('comissoes_sienge_corretores').update({
+                'senha_hash': None,
+                'aprovado': False,
+                'aprovado_por': None,
+                'aprovado_em': None,
+            }).eq('sienge_id', sienge_id).execute()
+            return {'sucesso': True}
+        except Exception as e:
+            return {'sucesso': False, 'erro': str(e)}
+
 
 def traduzir_status(status: str) -> str:
     """Traduz status do Sienge para português"""

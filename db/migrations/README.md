@@ -13,6 +13,7 @@ verificar antes o que já está aplicado.
 |---|---|
 | `20260703114205` | Desacopla o Comissões do `user_roles` global (função `comissoes_is_admin` + policy de DELETE de corretores) |
 | `20260703120555` | "Validação da diretoria": colunas `aprovado`/`aprovado_por`/`aprovado_em` em corretores + backfill dos acessos atuais |
+| `20260703123709` | Corrige `comissoes_usuarios.password_hash` para NULLABLE (pedido de acesso via Google inseria sem senha e falhava) |
 
 > A **regra de acesso** (exigir aprovação em todos os logins) é aplicada no
 > código Flask (`auth_manager.py` / `app.py`), porque o app conecta com a
