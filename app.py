@@ -169,6 +169,24 @@ def calcular_valor_gatilho(valor_a_vista: float, valor_itbi: float, regra: str) 
         return (valor_a_vista * 0.10) + valor_itbi
 
 
+# Tolerância de arredondamento do gatilho.
+# Aceita o gatilho como ATINGIDO quando o valor pago chega a (1 - TOLERANCIA) do valor
+# do gatilho. Com 1%, uma regra de 10% passa a valer ~9,9% — evita reprovar contratos
+# que ficam a centavos/arredondamento do alvo (ex.: cliente pagou 9,9% em vez de 10%).
+TOLERANCIA_GATILHO = 0.01
+
+
+def gatilho_foi_atingido(valor_pago, valor_gatilho) -> bool:
+    """True se o valor pago atingiu o gatilho, com folga de arredondamento (TOLERANCIA_GATILHO)."""
+    try:
+        vg = float(valor_gatilho)
+        if vg <= 0:
+            return False
+        return float(valor_pago) >= vg * (1 - TOLERANCIA_GATILHO)
+    except (TypeError, ValueError):
+        return False
+
+
 def obter_gatilho_contrato(sync, numero_contrato, building_id, comissao_record=None):
     """
     Função centralizada que calcula o gatilho de um contrato.
@@ -295,7 +313,7 @@ def obter_gatilho_contrato(sync, numero_contrato, building_id, comissao_record=N
             valor_gatilho = calcular_valor_gatilho(valor_a_vista, float(valor_itbi), regra_gatilho_texto)
         
         # 6. Verificar se atingiu (valor pago >= valor gatilho)
-        atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+        atingiu_gatilho = gatilho_foi_atingido(valor_pago, valor_gatilho)
         
         resultado = {
             'valor_gatilho': valor_gatilho,
@@ -900,7 +918,7 @@ def contratos_por_corretor():
                 # Usar valor_gatilho armazenado; se não existir, 10% do valor à vista
                 valor_gatilho = meta['valor_gatilho'] if meta['valor_gatilho'] is not None else valor_a_vista * 0.10
                 c['valor_gatilho'] = valor_gatilho
-                c['atingiu_gatilho'] = valor_pago_manual >= valor_gatilho if valor_gatilho > 0 else False
+                c['atingiu_gatilho'] = gatilho_foi_atingido(valor_pago_manual, valor_gatilho)
             else:
                 # Lógica normal para comissões do SIENGE
                 contrato = contratos_map.get(key)
@@ -958,7 +976,7 @@ def contratos_por_corretor():
                     atingiu_gatilho = None
                     c['dados_incompletos'] = True
                 else:
-                    atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                    atingiu_gatilho = gatilho_foi_atingido(valor_pago, valor_gatilho)
                     c['dados_incompletos'] = False
                 
                 c['valor_pago'] = valor_pago
@@ -1877,7 +1895,7 @@ def listar_todas_comissoes():
                 # Usar valor_gatilho armazenado; se não existir, 10% do valor à vista
                 valor_gatilho = meta['valor_gatilho'] if meta['valor_gatilho'] is not None else valor_a_vista * 0.10
                 c['valor_gatilho'] = valor_gatilho
-                c['atingiu_gatilho'] = valor_pago_manual >= valor_gatilho if valor_gatilho > 0 else False
+                c['atingiu_gatilho'] = gatilho_foi_atingido(valor_pago_manual, valor_gatilho)
                 
             else:
                 # Lógica normal para comissões do SIENGE
@@ -1938,7 +1956,7 @@ def listar_todas_comissoes():
                     atingiu_gatilho = None
                     c['dados_incompletos'] = True
                 else:
-                    atingiu_gatilho = float(valor_pago) >= valor_gatilho if valor_gatilho > 0 else False
+                    atingiu_gatilho = gatilho_foi_atingido(valor_pago, valor_gatilho)
                     c['dados_incompletos'] = False
                 
                 c['valor_pago'] = valor_pago
@@ -2034,7 +2052,7 @@ def criar_comissao_manual():
         # Calcular se atingiu gatilho
         valor_pago = float(data.get('valor_pago', 0))
         valor_gatilho = float(data.get('valor_gatilho', 0))
-        atingiu_gatilho = valor_pago >= valor_gatilho if valor_gatilho > 0 else False
+        atingiu_gatilho = gatilho_foi_atingido(valor_pago, valor_gatilho)
         
         # Gerar um número de contrato único para comissões manuais
         # Formato: MANUAL-YYYYMMDD-HHMMSS
