@@ -88,6 +88,30 @@ def contar_pendentes(user) -> int:
     except Exception:
         return 0
 
+
+# Endpoints que um CORRETOR pode acessar. Tudo o que não estiver aqui é bloqueado
+# (default-deny), impedindo que o corretor alcance dados/rotas de gestor.
+_CORRETOR_ENDPOINTS_PERMITIDOS = {
+    'static', 'login', 'logout', 'index', 'dashboard', 'dashboard_corretor',
+    'contratos_por_corretor', 'health_check', 'api_health_check',
+    'auth_google', 'auth_google_verify',
+}
+
+
+@app.before_request
+def _restringir_corretor():
+    """Isola o corretor na própria área: só a allowlist acima é permitida.
+    Gestores/Direção/Admin não são afetados. Não autenticado passa (o @login_required cuida)."""
+    if not current_user.is_authenticated:
+        return None
+    if not getattr(current_user, 'is_corretor', False):
+        return None
+    if request.endpoint in _CORRETOR_ENDPOINTS_PERMITIDOS:
+        return None
+    if request.path.startswith('/api/'):
+        return jsonify({'erro': 'Acesso negado'}), 403
+    return redirect(url_for('dashboard_corretor'))
+
 # ==================== CONFIG LOGIN GOOGLE (Supabase Auth) ====================
 # Login dos GESTORES é feito via Google, usando o mesmo Supabase Auth dos demais
 # sistemas. A chave abaixo é a PUBLICÁVEL (anon) — pode ir pro navegador.
@@ -831,13 +855,12 @@ def buscar_corretor_por_documento():
             return jsonify({
                 'sucesso': True,
                 'encontrado': True,
+                # Rota pública (pré-login, usada pelo cadastro): devolver o mínimo.
+                # Não expor telefone/CPF/CNPJ para quem não está autenticado.
                 'corretor': {
                     'sienge_id': corretor.get('sienge_id'),
-                    'cpf': corretor.get('cpf'),
-                    'cnpj': corretor.get('cnpj'),
                     'nome': corretor.get('nome'),
-                    'email': corretor.get('email') or '',
-                    'telefone': corretor.get('telefone') or ''
+                    'email': corretor.get('email') or ''
                 }
             }), 200
         
@@ -861,7 +884,13 @@ def contratos_por_corretor():
     try:
         corretor_id = request.args.get('corretor_id', type=int)
         corretor_nome = request.args.get('corretor_nome')
-        
+
+        # Segurança: corretor só enxerga os PRÓPRIOS dados. Ignora o que vier na URL
+        # (senão daria para ver comissões de outro corretor trocando o corretor_id).
+        if getattr(current_user, 'is_corretor', False):
+            corretor_id = current_user.sienge_id
+            corretor_nome = None
+
         sync = SiengeSupabaseSync()
         comissoes = sync.get_comissoes_por_corretor(corretor_id=corretor_id, corretor_nome=corretor_nome)
         
@@ -1386,6 +1415,8 @@ def listar_regras_gatilho():
 @app.route('/api/regras-gatilho', methods=['POST'])
 @login_required
 def criar_regra_gatilho():
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Acesso negado'}), 403
     try:
         data = request.get_json()
         sync = SiengeSupabaseSync()
@@ -1414,6 +1445,8 @@ def criar_regra_gatilho():
 @app.route('/api/regras-gatilho/<int:regra_id>', methods=['PUT'])
 @login_required
 def atualizar_regra_gatilho(regra_id):
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Acesso negado'}), 403
     try:
         data = request.get_json()
         sync = SiengeSupabaseSync()
@@ -1444,6 +1477,8 @@ def atualizar_regra_gatilho(regra_id):
 @app.route('/api/regras-gatilho/<int:regra_id>', methods=['DELETE'])
 @login_required
 def excluir_regra_gatilho(regra_id):
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Acesso negado'}), 403
     try:
         sync = SiengeSupabaseSync()
         sync.supabase.table('comissoes_regras_gatilho')\
@@ -1461,6 +1496,8 @@ def excluir_regra_gatilho(regra_id):
 @login_required
 def atualizar_regra_comissao(comissao_id):
     """Atualiza a regra de gatilho de uma comissão específica e recalcula os valores"""
+    if not current_user.is_admin:
+        return jsonify({'erro': 'Acesso negado'}), 403
     try:
         data = request.get_json()
         regra_gatilho_id = data.get('regra_gatilho_id')
