@@ -246,14 +246,18 @@ def obter_gatilho_contrato(sync, numero_contrato, building_id, comissao_record=N
             except (ValueError, TypeError):
                 pass
         
-        # Valor à vista = baseValue da comissão (valor_comissao), NÃO o valor do contrato.
-        # O campo contrato.valor_a_vista na view é populado com contract.value (valor total)
-        # pelo sync, então só serve como último recurso.
+        # Valor à vista = baseValue da comissão (valor_comissao). NÃO usar contrato.valor_a_vista:
+        # esse campo guarda o valor TOTAL (a prazo) e infla o gatilho.
+        # Fallback IGUAL ao da tela de Visualizar Comissões (admin): derivar o à vista de
+        # commission_value / percentual, para os dois cálculos baterem.
         valor_a_vista = 0
         if comissao_record:
             valor_a_vista = float(comissao_record.get('valor_comissao') or 0)
-        if valor_a_vista == 0 and contrato:
-            valor_a_vista = float(contrato.get('valor_a_vista') or 0)
+            if valor_a_vista == 0:
+                commission_value = float(comissao_record.get('commission_value') or 0)
+                percentual_comissao = float(comissao_record.get('installment_percentage') or 0)
+                if percentual_comissao > 0:
+                    valor_a_vista = commission_value / (percentual_comissao / 100)
         
         # 2. Buscar ITBI
         valor_itbi = sync.get_itbi_por_contrato(numero_contrato_str, building_id) or 0
