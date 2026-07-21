@@ -163,6 +163,7 @@ function renderizarTabelaComissoesDirecao(comissoes) {
                 <td>${comissao.unit_name || '-'}</td>
                 <td>${corrigirEspacamentoNome(comissao.customer_name)}</td>
                 <td class="valor-cell">${formatCurrency(comissao.commission_value)}</td>
+                <td>${formatCurrency(comissao.valor_pago)}</td>
                 <td style="color: #888;">${formatCurrency(valorGatilho)}</td>
                 <td><span class="gatilho-badge ${gatilhoClass}">${gatilhoText}</span></td>
                 <td>${formatDate(comissao.data_envio_aprovacao)}</td>
