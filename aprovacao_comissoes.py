@@ -83,7 +83,7 @@ class AprovacaoComissoes:
                     # Só enviar se ainda não foi enviada para aprovação
                     if comissao.get('status_aprovacao') in [self.STATUS_PENDENTE, None, '']:
                         comissoes.append(comissao)
-                        valor_total += float(comissao.get('valor_comissao') or comissao.get('commission_value') or 0)
+                        valor_total += float(comissao.get('commission_value') or 0)
             
             if not comissoes:
                 return {
@@ -376,7 +376,7 @@ class AprovacaoComissoes:
                 print("Nenhum e-mail de financeiro configurado")
                 return False
             
-            valor_total = sum(float(c.get('valor_comissao') or c.get('commission_value') or 0) for c in comissoes)
+            valor_total = sum(float(c.get('commission_value') or 0) for c in comissoes)
             
             # Criar mensagem HTML
             html = self._criar_email_html_financeiro(comissoes, valor_total)
@@ -421,7 +421,7 @@ class AprovacaoComissoes:
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('broker_nome', 'N/A')}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('enterprise_name', 'N/A')}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('unit_name', 'N/A')}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">R$ {float(comissao.get('valor_comissao') or comissao.get('commission_value') or 0):,.2f}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee;">R$ {float(comissao.get('commission_value') or 0):,.2f}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('installment_status', 'N/A')}</td>
             </tr>
             {observacao_html}
@@ -492,7 +492,7 @@ class AprovacaoComissoes:
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('broker_nome', 'N/A')}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('enterprise_name', 'N/A')}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{comissao.get('unit_name', 'N/A')}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">R$ {float(comissao.get('valor_comissao') or comissao.get('commission_value') or 0):,.2f}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee;">R$ {float(comissao.get('commission_value') or 0):,.2f}</td>
             </tr>
             {observacao_html}
             """

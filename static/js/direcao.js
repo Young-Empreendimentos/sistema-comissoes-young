@@ -101,7 +101,7 @@ async function carregarComissoesPendentes() {
 
 function atualizarEstatisticas(comissoes) {
     const total = comissoes.length;
-    const valorTotal = comissoes.reduce((sum, c) => sum + parseFloat(c.valor_comissao || c.commission_value || 0), 0);
+    const valorTotal = comissoes.reduce((sum, c) => sum + parseFloat(c.commission_value || 0), 0);
     
     // Animar contagem
     animateValue('totalPendente', total);
@@ -148,7 +148,7 @@ function renderizarTabelaComissoesDirecao(comissoes) {
                     <input type="checkbox" 
                            class="checkbox-direcao checkbox-comissao-direcao" 
                            data-id="${comissao.id}"
-                           data-valor="${comissao.valor_comissao || comissao.commission_value || 0}"
+                           data-valor="${comissao.commission_value || 0}"
                            onchange="toggleComissaoSelecionadaDirecao(this)">
                 </td>
                 <td>
@@ -162,7 +162,7 @@ function renderizarTabelaComissoesDirecao(comissoes) {
                 <td>${comissao.enterprise_name || '-'}</td>
                 <td>${comissao.unit_name || '-'}</td>
                 <td>${corrigirEspacamentoNome(comissao.customer_name)}</td>
-                <td class="valor-cell">${formatCurrency(comissao.valor_comissao || comissao.commission_value)}</td>
+                <td class="valor-cell">${formatCurrency(comissao.commission_value)}</td>
                 <td style="color: #888;">${formatCurrency(valorGatilho)}</td>
                 <td><span class="gatilho-badge ${gatilhoClass}">${gatilhoText}</span></td>
                 <td>${formatDate(comissao.data_envio_aprovacao)}</td>

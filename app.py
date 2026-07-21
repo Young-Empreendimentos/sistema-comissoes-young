@@ -1703,8 +1703,9 @@ def relatorio_comissoes():
                 if regra.get('inclui_itbi'):
                     regra_descricao += " + ITBI"
             
-            # Valor da comissão
-            valor_comissao = float(comissao.get('valor_comissao') or comissao.get('commission_value') or 0)
+            # Valor da comissão (commission_value é a comissão real; a coluna
+            # valor_comissao guarda o valor à vista/base, então NÃO usar aqui).
+            valor_comissao = float(comissao.get('commission_value') or 0)
             total_comissoes += valor_comissao
             
             # Auditoria
